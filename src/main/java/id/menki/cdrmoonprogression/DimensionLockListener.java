@@ -51,7 +51,10 @@ public final class DimensionLockListener implements Listener {
         String message = plugin.message(path, "&cDimension masih terkunci!")
                 .replace("{current}", String.valueOf(data.getTotal(stage)))
                 .replace("{target}", String.valueOf(service.target(stage)))
-                .replace("{percent}", String.format(java.util.Locale.US, "%.1f", service.percent(stage)));
+                .replace("{percent}", String.format(java.util.Locale.US, "%.1f", service.percent(stage)))
+                .replace("{requirements_done}", String.valueOf(service.completedRequirementCount(stage)))
+                .replace("{requirements_total}", String.valueOf(service.totalRequirementCount(stage)))
+                .replace("{requirements_status}", service.requirementsSatisfied(stage) ? "COMPLETE" : "INCOMPLETE");
         player.sendMessage(plugin.color(plugin.prefix() + message));
     }
 }
