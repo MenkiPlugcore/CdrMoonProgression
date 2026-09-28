@@ -7,6 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class CdrMoonProgressionPlugin extends JavaPlugin {
     private ProgressionDataStore dataStore;
     private PlacedBlockStore placedBlockStore;
+    private ContributionHistoryStore historyStore;
     private ProgressionService progressionService;
 
     @Override
@@ -21,7 +22,10 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         placedBlockStore = new PlacedBlockStore(this);
         placedBlockStore.load();
 
-        progressionService = new ProgressionService(this, dataStore);
+        historyStore = new ContributionHistoryStore(this);
+        historyStore.load();
+
+        progressionService = new ProgressionService(this, dataStore, historyStore);
 
         getServer().getPluginManager().registerEvents(new ProgressionListener(progressionService, placedBlockStore), this);
         getServer().getPluginManager().registerEvents(new DimensionLockListener(this, progressionService, dataStore), this);
@@ -32,7 +36,10 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         MilestoneMenu milestoneMenu = new MilestoneMenu(this, progressionService, dataStore, progressMenu);
         getServer().getPluginManager().registerEvents(milestoneMenu, this);
 
-        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore, progressMenu, milestoneMenu);
+        HistoryMenu historyMenu = new HistoryMenu(this, historyStore, progressMenu);
+        getServer().getPluginManager().registerEvents(historyMenu, this);
+
+        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore, progressMenu, milestoneMenu, historyMenu);
         PluginCommand progress = getCommand("progress");
         if (progress != null) {
             progress.setExecutor(progressCommand);
@@ -48,6 +55,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
 
         getServer().getScheduler().runTaskTimer(this, () -> {
             dataStore.saveIfDirty();
+            historyStore.saveIfDirty();
             placedBlockStore.requestAsyncSave();
         }, 1200L, 1200L);
 
@@ -59,6 +67,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         getLogger().info("CdrMoonProgression v" + getPluginMeta().getVersion() + " enabled.");
         getLogger().info("Progress mode: GUI DEPOSIT ONLY (block break does not add points).");
         getLogger().info("Milestone rewards: enabled (persistent one-time triggers).");
+        getLogger().info("Contribution history: " + historyStore.size() + " entries loaded.");
         getLogger().info("Overworld: " + dataStore.getTotal(ProgressStage.OVERWORLD) + "/" + progressionService.target(ProgressStage.OVERWORLD)
                 + " | Nether: " + dataStore.getTotal(ProgressStage.NETHER) + "/" + progressionService.target(ProgressStage.NETHER));
     }
@@ -66,6 +75,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         if (dataStore != null) dataStore.save();
+        if (historyStore != null) historyStore.save();
         if (placedBlockStore != null) placedBlockStore.saveSync();
     }
 

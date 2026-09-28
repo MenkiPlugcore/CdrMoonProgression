@@ -17,14 +17,16 @@ public final class ProgressCommand implements TabExecutor {
     private final ProgressionDataStore data;
     private final ProgressMenu menu;
     private final MilestoneMenu milestoneMenu;
+    private final HistoryMenu historyMenu;
 
     public ProgressCommand(CdrMoonProgressionPlugin plugin, ProgressionService service, ProgressionDataStore data,
-                           ProgressMenu menu, MilestoneMenu milestoneMenu) {
+                           ProgressMenu menu, MilestoneMenu milestoneMenu, HistoryMenu historyMenu) {
         this.plugin = plugin;
         this.service = service;
         this.data = data;
         this.menu = menu;
         this.milestoneMenu = milestoneMenu;
+        this.historyMenu = historyMenu;
     }
 
     @Override
@@ -36,6 +38,20 @@ public final class ProgressCommand implements TabExecutor {
 
         if (args.length == 0) {
             menu.openMain(player);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("history") || args[0].equalsIgnoreCase("riwayat")) {
+            HistoryMenu.Filter filter = HistoryMenu.Filter.ALL;
+            if (args.length > 1) {
+                filter = switch (args[1].toLowerCase(Locale.ROOT)) {
+                    case "overworld" -> HistoryMenu.Filter.OVERWORLD;
+                    case "nether" -> HistoryMenu.Filter.NETHER;
+                    case "me", "mine", "punyaku" -> HistoryMenu.Filter.MINE;
+                    default -> HistoryMenu.Filter.ALL;
+                };
+            }
+            historyMenu.open(player, filter, 0);
             return true;
         }
 
@@ -101,9 +117,12 @@ public final class ProgressCommand implements TabExecutor {
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
-        if (args.length == 1) return filter(List.of("overworld", "nether", "top", "me", "milestones"), args[0]);
+        if (args.length == 1) return filter(List.of("overworld", "nether", "top", "me", "milestones", "history"), args[0]);
         if (args.length == 2 && (args[0].equalsIgnoreCase("top") || args[0].equalsIgnoreCase("milestones") || args[0].equalsIgnoreCase("milestone"))) {
             return filter(List.of("overworld", "nether"), args[1]);
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("history") || args[0].equalsIgnoreCase("riwayat"))) {
+            return filter(List.of("all", "overworld", "nether", "me"), args[1]);
         }
         return List.of();
     }

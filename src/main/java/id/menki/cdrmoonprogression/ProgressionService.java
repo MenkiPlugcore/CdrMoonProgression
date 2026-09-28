@@ -21,6 +21,7 @@ import java.util.UUID;
 public final class ProgressionService {
     private final CdrMoonProgressionPlugin plugin;
     private final ProgressionDataStore data;
+    private final ContributionHistoryStore history;
     private final EnumMap<ProgressStage, Long> targets = new EnumMap<>(ProgressStage.class);
     private final EnumMap<ProgressStage, Map<Material, Integer>> depositValues = new EnumMap<>(ProgressStage.class);
     private final EnumMap<ProgressStage, List<Milestone>> milestones = new EnumMap<>(ProgressStage.class);
@@ -30,9 +31,10 @@ public final class ProgressionService {
     private List<String> endWorlds = List.of();
     private boolean dimensionLockEnabled;
 
-    public ProgressionService(CdrMoonProgressionPlugin plugin, ProgressionDataStore data) {
+    public ProgressionService(CdrMoonProgressionPlugin plugin, ProgressionDataStore data, ContributionHistoryStore history) {
         this.plugin = plugin;
         this.data = data;
+        this.history = history;
         reloadFromConfig();
     }
 
@@ -67,6 +69,7 @@ public final class ProgressionService {
         netherWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.nether"));
         endWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.end"));
         dimensionLockEnabled = plugin.getConfig().getBoolean("dimension-lock.enabled", true);
+        history.reloadSettings();
 
         initializeMilestoneState();
     }
@@ -195,6 +198,9 @@ public final class ProgressionService {
 
         long requestedPoints = (long) removed * pointValue;
         long actualPoints = addProgress(stage, requestedPoints, player.getUniqueId());
+        if (actualPoints > 0) {
+            history.add(player.getUniqueId(), player.getName(), stage, material, removed, actualPoints);
+        }
         return new DepositResult(true, removed, actualPoints, pointValue, countDepositable(player, material), null);
     }
 
