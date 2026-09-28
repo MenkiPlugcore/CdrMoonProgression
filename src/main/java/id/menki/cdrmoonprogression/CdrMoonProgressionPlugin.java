@@ -9,6 +9,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
     private PlacedBlockStore placedBlockStore;
     private ContributionHistoryStore historyStore;
     private ProgressionService progressionService;
+    private PersonalGoalService personalGoalService;
 
     @Override
     public void onEnable() {
@@ -26,6 +27,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         historyStore.load();
 
         progressionService = new ProgressionService(this, dataStore, historyStore);
+        personalGoalService = new PersonalGoalService(this, dataStore);
 
         getServer().getPluginManager().registerEvents(new ProgressionListener(progressionService, placedBlockStore), this);
         getServer().getPluginManager().registerEvents(new DimensionLockListener(this, progressionService, dataStore), this);
@@ -39,14 +41,19 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         HistoryMenu historyMenu = new HistoryMenu(this, historyStore, progressMenu);
         getServer().getPluginManager().registerEvents(historyMenu, this);
 
-        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore, progressMenu, milestoneMenu, historyMenu);
+        PersonalGoalMenu personalGoalMenu = new PersonalGoalMenu(this, dataStore, personalGoalService, progressMenu);
+        getServer().getPluginManager().registerEvents(personalGoalMenu, this);
+
+        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore,
+                progressMenu, milestoneMenu, historyMenu, personalGoalMenu);
         PluginCommand progress = getCommand("progress");
         if (progress != null) {
             progress.setExecutor(progressCommand);
             progress.setTabCompleter(progressCommand);
         }
 
-        ProgressAdminCommand adminCommand = new ProgressAdminCommand(this, progressionService, dataStore, placedBlockStore);
+        ProgressAdminCommand adminCommand = new ProgressAdminCommand(this, progressionService, dataStore,
+                placedBlockStore, historyStore, personalGoalService);
         PluginCommand progressAdmin = getCommand("progressadmin");
         if (progressAdmin != null) {
             progressAdmin.setExecutor(adminCommand);
@@ -68,6 +75,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         getLogger().info("Progress mode: GUI DEPOSIT ONLY (block break does not add points).");
         getLogger().info("Milestone rewards: enabled (persistent one-time triggers).");
         getLogger().info("Contribution history: " + historyStore.size() + " entries loaded.");
+        getLogger().info("Personal goals: " + (personalGoalService.enabled() ? "enabled, manual rewards" : "disabled") + ".");
         getLogger().info("Overworld: " + dataStore.getTotal(ProgressStage.OVERWORLD) + "/" + progressionService.target(ProgressStage.OVERWORLD)
                 + " | Nether: " + dataStore.getTotal(ProgressStage.NETHER) + "/" + progressionService.target(ProgressStage.NETHER));
     }
