@@ -10,38 +10,66 @@ Community dimension progression plugin untuk Moonsign. Target: Paper 1.21.11 / J
 4. Pilih resource yang tersedia di inventory.
 5. Pilih jumlah setoran: `1`, `16`, `64`, atau `Semua`.
 6. Item diambil dari inventory dan dikonversi menjadi progression point.
-7. Saat progress melewati milestone global, reward milestone dijalankan otomatis satu kali.
-8. Overworld mencapai `50,000` -> The Nether terbuka.
-9. Nether mencapai `70,000` -> The End terbuka.
+7. Setoran berhasil dicatat ke `history.yml`.
+8. Saat progress melewati milestone global, reward milestone dijalankan otomatis satu kali.
+9. Overworld mencapai `50,000` -> The Nether terbuka.
+10. Nether mencapai `70,000` -> The End terbuka.
 
 Mulai v0.3.0, menghancurkan block tidak lagi langsung menambah progression.
 
-## Fitur v0.4.0
+## Fitur v0.5.0
 
-- Full inventory GUI melalui `/progress`.
-- Contribution Deposit GUI.
-- Resource selector per stage.
-- Setor 1 / 16 / 64 / semua.
-- Global progression per stage.
-- Personal contribution per player.
+- Full inventory GUI progression melalui `/progress`.
+- Contribution Deposit GUI: setor `1 / 16 / 64 / semua`.
+- Global progression dan personal contribution.
 - Leaderboard contributor.
-- Deposit value configurable dari `config.yml`.
-- Milestone Rewards configurable per stage.
-- Default milestone `10% / 25% / 50% / 75% / 100%`.
-- Reward milestone menjalankan console commands tepat satu kali.
-- Broadcast/title/subtitle milestone configurable.
-- Milestone state persisten di `data.yml`, sehingga restart tidak menggandakan reward.
-- GUI status milestone: `PENDING / REACHED / REWARDED`.
-- `/progress milestones [overworld|nether]` untuk membuka Milestone GUI.
-- Reset stage juga mereset milestone claim untuk stage tersebut.
-- Migration aman dari v0.3: milestone yang sudah terlewati tidak otomatis membagikan reward lama secara default.
-- Hanya stage aktif yang dapat menerima setoran.
-- Deposit otomatis dibatasi agar tidak mengambil item berlebihan saat target hampir selesai.
+- Milestone Rewards `10% / 25% / 50% / 75% / 100%` yang configurable.
+- Milestone reward command hanya dieksekusi satu kali dan persisten di `data.yml`.
+- Contribution History tersimpan terpisah di `history.yml`.
+- Setiap history menyimpan player, UUID, stage, resource, jumlah item, poin aktual, dan timestamp.
+- GUI history paginated, 45 log per halaman.
+- Filter history: `Semua / Overworld / Nether / Punyaku`.
+- History retention configurable supaya file tidak tumbuh tanpa batas.
+- Hanya setoran berhasil yang masuk history; command admin `add/set` tidak dipalsukan menjadi deposit player.
+- Hanya stage aktif yang menerima setoran.
+- Deposit otomatis dibatasi ketika target hampir selesai.
 - Named/custom-model/PDC items tidak dianggap resource deposit vanilla.
 - Auto unlock Nether dan End.
 - Dimension lock untuk portal dan teleport.
 - Optional PlaceholderAPI hook.
-- Data progression tetap persisten pada `data.yml`.
+
+## Contribution History
+
+Buka GUI history:
+
+```text
+/progress history
+/progress history all
+/progress history overworld
+/progress history nether
+/progress history me
+```
+
+Contoh entry:
+
+```text
+Cadera • Raw Iron
+Stage: Overworld
+Resource: 32x Raw Iron
+Progress: +96 poin
+28 Sep 2026 • 21:30
+```
+
+Konfigurasi:
+
+```yaml
+history:
+  enabled: true
+  max-entries: 1000
+  timezone: 'Asia/Jakarta'
+```
+
+Entry terbaru disimpan paling atas. Ketika jumlah log melebihi `max-entries`, log paling lama dibuang otomatis.
 
 ## Milestone Rewards
 
@@ -63,15 +91,7 @@ milestones:
         - 'give @a minecraft:diamond 1'
 ```
 
-Command dijalankan sebagai console. Placeholder yang dapat digunakan:
-
-- `{stage}`
-- `{stage_key}`
-- `{percent}`
-- `{current}`
-- `{target}`
-
-`reward-existing-progress-on-first-load: false` direkomendasikan saat upgrade server live. Progress lama yang sudah melewati milestone akan ditandai sebagai rewarded tanpa menjalankan reward secara mendadak.
+Command milestone dijalankan sebagai console. Placeholder tersedia: `{stage}`, `{stage_key}`, `{percent}`, `{current}`, `{target}`.
 
 ## Default deposit resources
 
@@ -110,6 +130,7 @@ Semua nilai poin dapat diubah pada `progression.<stage>.deposit-items` di `confi
 - `/progress top [overworld|nether]`
 - `/progress me`
 - `/progress milestones [overworld|nether]`
+- `/progress history [all|overworld|nether|me]`
 - `/progressadmin status`
 - `/progressadmin add <overworld|nether> <amount> [player]`
 - `/progressadmin set <overworld|nether> <amount>`
@@ -152,5 +173,5 @@ mvn clean package
 Output:
 
 ```text
-target/CdrMoonProgression-0.4.0-SNAPSHOT.jar
+target/CdrMoonProgression-0.5.0-SNAPSHOT.jar
 ```
