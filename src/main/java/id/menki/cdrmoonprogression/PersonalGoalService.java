@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 public final class PersonalGoalService {
@@ -104,7 +103,7 @@ public final class PersonalGoalService {
     }
 
     public boolean markRewarded(UUID playerId, ProgressStage stage, long goalPoints) {
-        if (!enabled || !isConfiguredGoal(stage, goalPoints)) return false;
+        if (!isConfiguredGoal(stage, goalPoints)) return false;
         if (data.getContribution(playerId, stage) < goalPoints) return false;
         data.markPersonalGoalRewarded(playerId, stage, goalPoints);
         return true;
@@ -122,14 +121,6 @@ public final class PersonalGoalService {
             if (contribution < goal.points()) return goal.points();
         }
         return -1L;
-    }
-
-    public String prettyStatus(Status status) {
-        return switch (status) {
-            case LOCKED -> "LOCKED";
-            case PENDING_REWARD -> "PENDING REWARD";
-            case REWARDED -> "REWARDED";
-        };
     }
 
     public enum Status {
