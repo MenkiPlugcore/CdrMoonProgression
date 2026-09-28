@@ -21,6 +21,7 @@ public final class ProgressionDataStore {
     private final EnumMap<ProgressStage, Long> totals = new EnumMap<>(ProgressStage.class);
     private final Map<UUID, EnumMap<ProgressStage, Long>> contributions = new HashMap<>();
     private final EnumMap<ProgressStage, Set<Integer>> claimedMilestones = new EnumMap<>(ProgressStage.class);
+    private final Map<UUID, EnumMap<ProgressStage, Set<Long>>> rewardedPersonalGoals = new HashMap<>();
 
     private boolean netherUnlocked;
     private boolean endUnlocked;
@@ -72,6 +73,27 @@ public final class ProgressionDataStore {
                 if (percent > 0 && percent <= 100) values.add(percent);
             }
         }
+
+        rewardedPersonalGoals.clear();
+        ConfigurationSection rewardRoot = yaml.getConfigurationSection("personal-goals.rewarded");
+        if (rewardRoot != null) {
+            for (String rawUuid : rewardRoot.getKeys(false)) {
+                try {
+                    UUID uuid = UUID.fromString(rawUuid);
+                    EnumMap<ProgressStage, Set<Long>> byStage = new EnumMap<>(ProgressStage.class);
+                    for (ProgressStage stage : ProgressStage.values()) {
+                        Set<Long> goals = new HashSet<>();
+                        for (long goal : rewardRoot.getLongList(rawUuid + "." + stage.key())) {
+                            if (goal > 0L) goals.add(goal);
+                        }
+                        if (!goals.isEmpty()) byStage.put(stage, goals);
+                    }
+                    if (!byStage.isEmpty()) rewardedPersonalGoals.put(uuid, byStage);
+                } catch (IllegalArgumentException ex) {
+                    plugin.getLogger().warning("Mengabaikan UUID personal goal invalid di data.yml: " + rawUuid);
+                }
+            }
+        }
         dirty = false;
     }
 
@@ -105,6 +127,16 @@ public final class ProgressionDataStore {
                 if (amount > 0) {
                     yaml.set("contributions." + entry.getKey() + "." + stage.key(), amount);
                 }
+            }
+        }
+
+        for (Map.Entry<UUID, EnumMap<ProgressStage, Set<Long>>> entry : rewardedPersonalGoals.entrySet()) {
+            for (ProgressStage stage : ProgressStage.values()) {
+                Set<Long> values = entry.getValue().get(stage);
+                if (values == null || values.isEmpty()) continue;
+                List<Long> sorted = new ArrayList<>(values);
+                sorted.sort(Long::compareTo);
+                yaml.set("personal-goals.rewarded." + entry.getKey() + "." + stage.key(), sorted);
             }
         }
 
@@ -144,6 +176,10 @@ public final class ProgressionDataStore {
         dirty = true;
     }
 
+    public Set<UUID> contributorIds() {
+        return Set.copyOf(contributions.keySet());
+    }
+
     public boolean isMilestoneClaimed(ProgressStage stage, int percent) {
         return claimedMilestones.getOrDefault(stage, Set.of()).contains(percent);
     }
@@ -167,6 +203,29 @@ public final class ProgressionDataStore {
         dirty = true;
     }
 
+    public boolean isPersonalGoalRewarded(UUID uuid, ProgressStage stage, long goal) {
+        EnumMap<ProgressStage, Set<Long>> byStage = rewardedPersonalGoals.get(uuid);
+        if (byStage == null) return false;
+        return byStage.getOrDefault(stage, Set.of()).contains(goal);
+    }
+
+    public void markPersonalGoalRewarded(UUID uuid, ProgressStage stage, long goal) {
+        if (uuid == null || stage == null || goal <= 0L) return;
+        EnumMap<ProgressStage, Set<Long>> byStage = rewardedPersonalGoals.computeIfAbsent(uuid, ignored -> new EnumMap<>(ProgressStage.class));
+        byStage.computeIfAbsent(stage, ignored -> new HashSet<>()).add(goal);
+        dirty = true;
+    }
+
+    public void unmarkPersonalGoalRewarded(UUID uuid, ProgressStage stage, long goal) {
+        EnumMap<ProgressStage, Set<Long>> byStage = rewardedPersonalGoals.get(uuid);
+        if (byStage == null) return;
+        Set<Long> values = byStage.get(stage);
+        if (values == null) return;
+        if (values.remove(goal)) dirty = true;
+        if (values.isEmpty()) byStage.remove(stage);
+        if (byStage.isEmpty()) rewardedPersonalGoals.remove(uuid);
+    }
+
     public void resetStage(ProgressStage stage) {
         totals.put(stage, 0L);
         for (EnumMap<ProgressStage, Long> values : contributions.values()) {
@@ -174,6 +233,10 @@ public final class ProgressionDataStore {
         }
         contributions.entrySet().removeIf(entry -> entry.getValue().isEmpty());
         claimedMilestones.computeIfAbsent(stage, ignored -> new HashSet<>()).clear();
+        for (EnumMap<ProgressStage, Set<Long>> values : rewardedPersonalGoals.values()) {
+            values.remove(stage);
+        }
+        rewardedPersonalGoals.entrySet().removeIf(entry -> entry.getValue().isEmpty());
         dirty = true;
     }
 
@@ -181,6 +244,7 @@ public final class ProgressionDataStore {
         for (ProgressStage stage : ProgressStage.values()) totals.put(stage, 0L);
         contributions.clear();
         for (Set<Integer> values : claimedMilestones.values()) values.clear();
+        rewardedPersonalGoals.clear();
         netherUnlocked = false;
         endUnlocked = false;
         milestonesInitialized = true;
