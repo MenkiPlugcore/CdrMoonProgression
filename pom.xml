@@ -6,9 +6,9 @@
 
     <groupId>id.menki</groupId>
     <artifactId>CdrMoonProgression</artifactId>
-    <version>0.7.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>CdrMoonProgression</name>
-    <description>Community dimension progression for Moonsign.</description>
+    <description>Dimension lock, community progression, personal contribution, and leaderboard for Moonsign.</description>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
