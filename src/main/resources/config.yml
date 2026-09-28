@@ -1,4 +1,4 @@
-# CdrMoonProgression v0.5.0
+# CdrMoonProgression v0.6.0
 # Paper 1.21.11 / Java 21
 #
 # Progression TIDAK bertambah saat block dihancurkan.
@@ -44,15 +44,10 @@ progression:
 # ============================================================
 # MILESTONE REWARDS
 # ============================================================
-# Reward command dijalankan sebagai CONSOLE tepat satu kali per milestone.
+# Global milestone reward tetap dapat memakai console command otomatis.
+# Ini berbeda dengan PERSONAL GOALS di bawah yang reward-nya MANUAL oleh admin.
 # Placeholder tersedia di broadcast/title/subtitle/commands:
 # {stage} {stage_key} {percent} {current} {target}
-#
-# Contoh integrasi (hapus # bila ingin dipakai):
-#   commands:
-#     - "eco give * 500"
-#     - "crate key giveall expedition 1"
-#     - "give @a minecraft:diamond 1"
 #
 # false = saat upgrade dari v0.3, milestone yang sudah terlewati ditandai
 # sebagai REWARDED tanpa mengeksekusi reward lama secara tiba-tiba.
@@ -170,6 +165,81 @@ milestones:
       title: '&d&l100% COMPLETE'
       subtitle: '&fThe End expedition objective selesai.'
       commands: []
+
+# ============================================================
+# PERSONAL CONTRIBUTION GOALS
+# ============================================================
+# Reward personal TIDAK PERNAH diberikan otomatis oleh plugin.
+# Saat goal tercapai, status menjadi PENDING REWARD.
+# Admin memberi hadiah secara manual, lalu menandai goal sebagai REWARDED:
+# /progressadmin goals reward <player> <overworld|nether> <goal>
+#
+# Untuk melihat antrean reward manual:
+# /progressadmin goals pending [overworld|nether|all]
+personal-goals:
+  enabled: true
+
+  overworld:
+    '500':
+      name: '&a&lContributor I &8• &f500'
+      icon: IRON_NUGGET
+      lore:
+        - '&7Kontribusi awal untuk'
+        - '&7Overworld Expedition.'
+    '1000':
+      name: '&e&lContributor II &8• &f1,000'
+      icon: IRON_INGOT
+      lore:
+        - '&7Kontribusi personal mulai'
+        - '&7memberi dampak besar.'
+    '2500':
+      name: '&6&lContributor III &8• &f2,500'
+      icon: GOLD_INGOT
+      lore:
+        - '&7Kontributor utama untuk'
+        - '&7Overworld Expedition.'
+    '5000':
+      name: '&b&lContributor IV &8• &f5,000'
+      icon: DIAMOND
+      lore:
+        - '&7Kontribusi tingkat tinggi.'
+    '10000':
+      name: '&d&lContributor Elite &8• &f10,000'
+      icon: NETHER_STAR
+      lore:
+        - '&7Pencapaian kontribusi personal'
+        - '&7tertinggi di stage Overworld.'
+
+  nether:
+    '500':
+      name: '&a&lNether Contributor I &8• &f500'
+      icon: NETHER_BRICK
+      lore:
+        - '&7Kontribusi awal untuk'
+        - '&7Nether Expedition.'
+    '1000':
+      name: '&e&lNether Contributor II &8• &f1,000'
+      icon: QUARTZ
+      lore:
+        - '&7Kontribusi stabil menuju'
+        - '&7persiapan The End.'
+    '2500':
+      name: '&6&lNether Contributor III &8• &f2,500'
+      icon: GOLD_INGOT
+      lore:
+        - '&7Kontributor utama stage Nether.'
+    '5000':
+      name: '&b&lNether Contributor IV &8• &f5,000'
+      icon: ANCIENT_DEBRIS
+      lore:
+        - '&7Kontribusi tingkat tinggi'
+        - '&7untuk membuka The End.'
+    '10000':
+      name: '&d&lNether Contributor Elite &8• &f10,000'
+      icon: ENDER_EYE
+      lore:
+        - '&7Pencapaian kontribusi personal'
+        - '&7tertinggi di stage Nether.'
 
 # ============================================================
 # CONTRIBUTION HISTORY
