@@ -5,29 +5,27 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 public final class ProgressionService {
     private final CdrMoonProgressionPlugin plugin;
     private final ProgressionDataStore data;
     private final EnumMap<ProgressStage, Long> targets = new EnumMap<>(ProgressStage.class);
-    private final EnumMap<ProgressStage, Map<Material, Integer>> blockValues = new EnumMap<>(ProgressStage.class);
-    private final Set<Material> trackedMaterials = new HashSet<>();
+    private final EnumMap<ProgressStage, Map<Material, Integer>> depositValues = new EnumMap<>(ProgressStage.class);
 
     private List<String> overworldWorlds = List.of();
     private List<String> netherWorlds = List.of();
     private List<String> endWorlds = List.of();
-    private boolean countOnlySurvival;
-    private boolean trackPlacedBlocks;
     private boolean dimensionLockEnabled;
 
     public ProgressionService(CdrMoonProgressionPlugin plugin, ProgressionDataStore data) {
@@ -38,35 +36,32 @@ public final class ProgressionService {
 
     public void reloadFromConfig() {
         targets.clear();
-        blockValues.clear();
-        trackedMaterials.clear();
+        depositValues.clear();
 
         for (ProgressStage stage : ProgressStage.values()) {
-            long target = Math.max(1L, plugin.getConfig().getLong("progression." + stage.key() + ".target", stage == ProgressStage.OVERWORLD ? 50_000L : 70_000L));
+            long defaultTarget = stage == ProgressStage.OVERWORLD ? 50_000L : 70_000L;
+            long target = Math.max(1L, plugin.getConfig().getLong("progression." + stage.key() + ".target", defaultTarget));
             targets.put(stage, target);
 
             Map<Material, Integer> values = new EnumMap<>(Material.class);
-            ConfigurationSection section = plugin.getConfig().getConfigurationSection("progression." + stage.key() + ".blocks");
+            ConfigurationSection section = plugin.getConfig().getConfigurationSection("progression." + stage.key() + ".deposit-items");
             if (section != null) {
                 for (String key : section.getKeys(false)) {
                     Material material = Material.matchMaterial(key.toUpperCase(Locale.ROOT));
                     int value = section.getInt(key, 0);
                     if (material == null) {
-                        plugin.getLogger().warning("Material tidak dikenal di config: " + key);
+                        plugin.getLogger().warning("Material deposit tidak dikenal di config: " + key);
                     } else if (value > 0) {
                         values.put(material, value);
-                        trackedMaterials.add(material);
                     }
                 }
             }
-            blockValues.put(stage, values);
+            depositValues.put(stage, values);
         }
 
         overworldWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.overworld"));
         netherWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.nether"));
         endWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.end"));
-        countOnlySurvival = plugin.getConfig().getBoolean("anti-exploit.count-only-survival", true);
-        trackPlacedBlocks = plugin.getConfig().getBoolean("anti-exploit.track-player-placed-blocks", true);
         dimensionLockEnabled = plugin.getConfig().getBoolean("dimension-lock.enabled", true);
     }
 
@@ -97,16 +92,78 @@ public final class ProgressionService {
         return world.getEnvironment() == fallback;
     }
 
-    public boolean isTrackedMaterial(Material material) {
-        return trackedMaterials.contains(material);
+    public Map<Material, Integer> depositValues(ProgressStage stage) {
+        return Map.copyOf(depositValues.getOrDefault(stage, Map.of()));
     }
 
-    public int blockValue(ProgressStage stage, Material material) {
-        return blockValues.getOrDefault(stage, Map.of()).getOrDefault(material, 0);
+    public int depositValue(ProgressStage stage, Material material) {
+        return depositValues.getOrDefault(stage, Map.of()).getOrDefault(material, 0);
     }
 
-    public Map<Material, Integer> blockValues(ProgressStage stage) {
-        return Map.copyOf(blockValues.getOrDefault(stage, Map.of()));
+    public int countDepositable(Player player, Material material) {
+        int total = 0;
+        for (ItemStack stack : player.getInventory().getStorageContents()) {
+            if (isDepositableStack(stack, material)) total += stack.getAmount();
+        }
+        return total;
+    }
+
+    public DepositResult deposit(Player player, ProgressStage stage, Material material, int requestedAmount) {
+        if (player == null || stage == null || material == null) return DepositResult.failed("invalid");
+        if (!isStageActive(stage)) return DepositResult.failed("inactive-stage");
+
+        int pointValue = depositValue(stage, material);
+        if (pointValue <= 0) return DepositResult.failed("invalid-resource");
+
+        int available = countDepositable(player, material);
+        if (available <= 0) return DepositResult.failed("no-items");
+
+        int wanted = requestedAmount <= 0 || requestedAmount == Integer.MAX_VALUE
+                ? available
+                : Math.min(requestedAmount, available);
+
+        long remainingPoints = Math.max(0L, target(stage) - data.getTotal(stage));
+        if (remainingPoints <= 0L) return DepositResult.failed("completed");
+
+        long usefulItemsLong = (remainingPoints + pointValue - 1L) / pointValue;
+        int usefulItems = (int) Math.min(Integer.MAX_VALUE, usefulItemsLong);
+        int toConsume = Math.min(wanted, usefulItems);
+        if (toConsume <= 0) return DepositResult.failed("completed");
+
+        int removed = removeDepositable(player.getInventory(), material, toConsume);
+        if (removed <= 0) return DepositResult.failed("no-items");
+
+        long requestedPoints = (long) removed * pointValue;
+        long actualPoints = addProgress(stage, requestedPoints, player.getUniqueId());
+        return new DepositResult(true, removed, actualPoints, pointValue, countDepositable(player, material), null);
+    }
+
+    private int removeDepositable(PlayerInventory inventory, Material material, int amount) {
+        ItemStack[] contents = inventory.getStorageContents();
+        int remaining = amount;
+        int removed = 0;
+
+        for (int i = 0; i < contents.length && remaining > 0; i++) {
+            ItemStack stack = contents[i];
+            if (!isDepositableStack(stack, material)) continue;
+
+            int take = Math.min(remaining, stack.getAmount());
+            stack.setAmount(stack.getAmount() - take);
+            if (stack.getAmount() <= 0) contents[i] = null;
+            removed += take;
+            remaining -= take;
+        }
+
+        inventory.setStorageContents(contents);
+        return removed;
+    }
+
+    private boolean isDepositableStack(ItemStack stack, Material material) {
+        if (stack == null || stack.getType() != material || stack.getAmount() <= 0) return false;
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) return true;
+        if (meta.hasDisplayName() || meta.hasLore() || meta.hasCustomModelData()) return false;
+        return meta.getPersistentDataContainer().isEmpty();
     }
 
     public long target(ProgressStage stage) {
@@ -202,15 +259,14 @@ public final class ProgressionService {
         data.save();
     }
 
-    public boolean countOnlySurvival() {
-        return countOnlySurvival;
-    }
-
-    public boolean trackPlacedBlocks() {
-        return trackPlacedBlocks;
-    }
-
     public boolean dimensionLockEnabled() {
         return dimensionLockEnabled;
+    }
+
+    public record DepositResult(boolean success, int itemsConsumed, long pointsAdded, int pointValue,
+                                int remainingItems, String reason) {
+        public static DepositResult failed(String reason) {
+            return new DepositResult(false, 0, 0L, 0, 0, reason);
+        }
     }
 }
