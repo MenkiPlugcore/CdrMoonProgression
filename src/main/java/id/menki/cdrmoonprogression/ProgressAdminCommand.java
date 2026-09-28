@@ -64,9 +64,106 @@ public final class ProgressAdminCommand implements TabExecutor {
             case "unlock" -> handleUnlock(sender, args);
             case "lock" -> handleLock(sender, args);
             case "goals", "goal" -> handleGoals(sender, args);
+            case "requirements", "requirement", "req" -> handleRequirements(sender, args);
             default -> help(sender);
         }
         return true;
+    }
+
+    private void handleRequirements(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            requirementsHelp(sender);
+            return;
+        }
+
+        switch (args[1].toLowerCase(Locale.ROOT)) {
+            case "status" -> showRequirements(sender, args);
+            case "set" -> modifyRequirement(sender, args, false);
+            case "add" -> modifyRequirement(sender, args, true);
+            case "reset" -> resetRequirements(sender, args);
+            default -> requirementsHelp(sender);
+        }
+    }
+
+    private void showRequirements(CommandSender sender, String[] args) {
+        ProgressStage filter = null;
+        if (args.length >= 3 && !args[2].equalsIgnoreCase("all")) {
+            filter = ProgressStage.parse(args[2]).orElse(null);
+            if (filter == null) {
+                sender.sendMessage(plugin.color("&cStage harus overworld, nether, atau all."));
+                return;
+            }
+        }
+
+        sender.sendMessage(plugin.color("&8&m----------------------------------------"));
+        sender.sendMessage(plugin.color("&e&lRESOURCE REQUIREMENTS"));
+        for (ProgressStage stage : ProgressStage.values()) {
+            if (filter != null && filter != stage) continue;
+            sender.sendMessage(plugin.color("&b" + stage.displayName() + " &8• &f"
+                    + service.completedRequirementCount(stage) + "/" + service.totalRequirementCount(stage) + " selesai"));
+            if (service.requirements(stage).isEmpty()) {
+                sender.sendMessage(plugin.color("&8  Tidak ada requirement configured."));
+                continue;
+            }
+            for (ProgressionService.ResourceRequirement requirement : service.requirements(stage)) {
+                long current = service.requirementProgress(stage, requirement);
+                sender.sendMessage(plugin.color("&7  " + requirement.id() + " &8• &f" + format(current)
+                        + "&7/&f" + format(requirement.target())
+                        + (current >= requirement.target() ? " &aCOMPLETE" : " &cINCOMPLETE")));
+            }
+        }
+        sender.sendMessage(plugin.color("&8&m----------------------------------------"));
+    }
+
+    private void modifyRequirement(CommandSender sender, String[] args, boolean add) {
+        if (args.length < 5) {
+            sender.sendMessage(plugin.color("&cUsage: /progressadmin requirements " + (add ? "add" : "set")
+                    + " <overworld|nether> <requirement-id> <amount>"));
+            return;
+        }
+        ProgressStage stage = ProgressStage.parse(args[2]).orElse(null);
+        Long amount = nonNegativeLong(args[4]);
+        if (stage == null || amount == null) {
+            sender.sendMessage(plugin.color("&cStage atau amount invalid."));
+            return;
+        }
+        if (service.requirement(stage, args[3]).isEmpty()) {
+            sender.sendMessage(plugin.color("&cRequirement ID tidak ditemukan di config stage tersebut."));
+            return;
+        }
+
+        boolean success = add
+                ? service.addRequirementProgress(stage, args[3], amount)
+                : service.setRequirementProgress(stage, args[3], amount);
+        if (!success) {
+            sender.sendMessage(plugin.color("&cGagal mengubah requirement."));
+            return;
+        }
+        ProgressionService.ResourceRequirement requirement = service.requirement(stage, args[3]).orElseThrow();
+        data.save();
+        sender.sendMessage(plugin.color(plugin.prefix() + "&aRequirement &f" + requirement.id() + " &a="
+                + " &f" + format(service.requirementProgress(stage, requirement)) + "&7/&f" + format(requirement.target()) + "&a."));
+    }
+
+    private void resetRequirements(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(plugin.color("&cUsage: /progressadmin requirements reset <overworld|nether|all>"));
+            return;
+        }
+        if (args[2].equalsIgnoreCase("all")) {
+            for (ProgressStage stage : ProgressStage.values()) service.resetRequirementProgress(stage);
+            data.save();
+            sender.sendMessage(plugin.color(plugin.prefix() + "&eSemua resource requirement progress direset."));
+            return;
+        }
+        ProgressStage stage = ProgressStage.parse(args[2]).orElse(null);
+        if (stage == null) {
+            sender.sendMessage(plugin.color("&cStage invalid."));
+            return;
+        }
+        service.resetRequirementProgress(stage);
+        data.save();
+        sender.sendMessage(plugin.color(plugin.prefix() + "&eResource requirement progress " + stage.displayName() + " direset."));
     }
 
     private void handleGoals(CommandSender sender, String[] args) {
@@ -216,7 +313,7 @@ public final class ProgressAdminCommand implements TabExecutor {
         }
         if (args[1].equalsIgnoreCase("all")) {
             data.resetAll();
-            sender.sendMessage(plugin.color(plugin.prefix() + "&eSemua progression, contribution, milestone, dan personal goal state direset."));
+            sender.sendMessage(plugin.color(plugin.prefix() + "&eSemua progression, contribution, milestone, personal goal, dan requirement state direset."));
             return;
         }
         ProgressStage stage = ProgressStage.parse(args[1]).orElse(null);
@@ -225,7 +322,7 @@ public final class ProgressAdminCommand implements TabExecutor {
             return;
         }
         service.reset(stage);
-        sender.sendMessage(plugin.color(plugin.prefix() + "&eProgress dan personal goal state " + stage.displayName() + " direset."));
+        sender.sendMessage(plugin.color(plugin.prefix() + "&eProgress, requirement, dan personal goal state " + stage.displayName() + " direset."));
     }
 
     private void handleUnlock(CommandSender sender, String[] args) {
@@ -260,7 +357,8 @@ public final class ProgressAdminCommand implements TabExecutor {
         sender.sendMessage(plugin.color("&8&m----------------------------------------"));
         sender.sendMessage(plugin.color("&b&lCdrMoonProgression Admin Status"));
         for (ProgressStage stage : ProgressStage.values()) {
-            sender.sendMessage(plugin.color("&f" + stage.displayName() + ": &b" + data.getTotal(stage) + "&7/&f" + service.target(stage)));
+            sender.sendMessage(plugin.color("&f" + stage.displayName() + ": &b" + data.getTotal(stage) + "&7/&f" + service.target(stage)
+                    + " &8• &7requirements &f" + service.completedRequirementCount(stage) + "/" + service.totalRequirementCount(stage)));
         }
         sender.sendMessage(plugin.color("&7Nether unlocked: " + (data.isNetherUnlocked() ? "&aYES" : "&cNO")));
         sender.sendMessage(plugin.color("&7End unlocked: " + (data.isEndUnlocked() ? "&aYES" : "&cNO")));
@@ -277,11 +375,20 @@ public final class ProgressAdminCommand implements TabExecutor {
         sender.sendMessage(plugin.color("&b/progressadmin reset <stage|all>"));
         sender.sendMessage(plugin.color("&b/progressadmin unlock <nether|end>"));
         sender.sendMessage(plugin.color("&b/progressadmin lock <nether|end>"));
+        sender.sendMessage(plugin.color("&b/progressadmin requirements <status|set|add|reset> ..."));
         sender.sendMessage(plugin.color("&b/progressadmin goals pending [stage|all]"));
         sender.sendMessage(plugin.color("&b/progressadmin goals reward <player> <stage> <goal>"));
         sender.sendMessage(plugin.color("&b/progressadmin goals unreward <player> <stage> <goal>"));
         sender.sendMessage(plugin.color("&b/progressadmin reload"));
         sender.sendMessage(plugin.color("&b/progressadmin save"));
+    }
+
+    private void requirementsHelp(CommandSender sender) {
+        sender.sendMessage(plugin.color("&eResource Requirement Admin"));
+        sender.sendMessage(plugin.color("&b/progressadmin requirements status [overworld|nether|all]"));
+        sender.sendMessage(plugin.color("&b/progressadmin requirements set <stage> <id> <amount>"));
+        sender.sendMessage(plugin.color("&b/progressadmin requirements add <stage> <id> <amount>"));
+        sender.sendMessage(plugin.color("&b/progressadmin requirements reset <overworld|nether|all>"));
     }
 
     private void goalsHelp(CommandSender sender) {
@@ -312,10 +419,26 @@ public final class ProgressAdminCommand implements TabExecutor {
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
-        if (args.length == 1) return filter(List.of("status", "add", "set", "reset", "unlock", "lock", "goals", "reload", "save"), args[0]);
+        if (args.length == 1) return filter(List.of("status", "add", "set", "reset", "unlock", "lock", "requirements", "goals", "reload", "save"), args[0]);
         if (args.length == 2 && List.of("add", "set").contains(args[0].toLowerCase(Locale.ROOT))) return filter(List.of("overworld", "nether"), args[1]);
         if (args.length == 2 && args[0].equalsIgnoreCase("reset")) return filter(List.of("overworld", "nether", "all"), args[1]);
         if (args.length == 2 && List.of("unlock", "lock").contains(args[0].toLowerCase(Locale.ROOT))) return filter(List.of("nether", "end"), args[1]);
+
+        if (args.length == 2 && isRequirements(args[0])) return filter(List.of("status", "set", "add", "reset"), args[1]);
+        if (args.length == 3 && isRequirements(args[0]) && List.of("status", "reset").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(List.of("all", "overworld", "nether"), args[2]);
+        }
+        if (args.length == 3 && isRequirements(args[0]) && List.of("set", "add").contains(args[1].toLowerCase(Locale.ROOT))) {
+            return filter(List.of("overworld", "nether"), args[2]);
+        }
+        if (args.length == 4 && isRequirements(args[0]) && List.of("set", "add").contains(args[1].toLowerCase(Locale.ROOT))) {
+            ProgressStage stage = ProgressStage.parse(args[2]).orElse(null);
+            if (stage == null) return List.of();
+            List<String> ids = new ArrayList<>();
+            for (ProgressionService.ResourceRequirement requirement : service.requirements(stage)) ids.add(requirement.id());
+            return filter(ids, args[3]);
+        }
+
         if (args.length == 2 && (args[0].equalsIgnoreCase("goals") || args[0].equalsIgnoreCase("goal"))) {
             return filter(List.of("pending", "reward", "unreward"), args[1]);
         }
@@ -350,6 +473,10 @@ public final class ProgressAdminCommand implements TabExecutor {
             return filter(players, args[3]);
         }
         return List.of();
+    }
+
+    private boolean isRequirements(String value) {
+        return value.equalsIgnoreCase("requirements") || value.equalsIgnoreCase("requirement") || value.equalsIgnoreCase("req");
     }
 
     private List<String> filter(List<String> values, String prefix) {

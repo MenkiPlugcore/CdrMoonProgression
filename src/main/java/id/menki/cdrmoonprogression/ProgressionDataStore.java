@@ -22,10 +22,12 @@ public final class ProgressionDataStore {
     private final Map<UUID, EnumMap<ProgressStage, Long>> contributions = new HashMap<>();
     private final EnumMap<ProgressStage, Set<Integer>> claimedMilestones = new EnumMap<>(ProgressStage.class);
     private final Map<UUID, EnumMap<ProgressStage, Set<Long>>> rewardedPersonalGoals = new HashMap<>();
+    private final EnumMap<ProgressStage, Map<String, Long>> requirementProgress = new EnumMap<>(ProgressStage.class);
 
     private boolean netherUnlocked;
     private boolean endUnlocked;
     private boolean milestonesInitialized;
+    private boolean requirementsInitialized;
     private boolean dirty;
 
     public ProgressionDataStore(CdrMoonProgressionPlugin plugin) {
@@ -34,6 +36,7 @@ public final class ProgressionDataStore {
         for (ProgressStage stage : ProgressStage.values()) {
             totals.put(stage, 0L);
             claimedMilestones.put(stage, new HashSet<>());
+            requirementProgress.put(stage, new HashMap<>());
         }
     }
 
@@ -47,6 +50,7 @@ public final class ProgressionDataStore {
         netherUnlocked = yaml.getBoolean("unlocked.nether", false);
         endUnlocked = yaml.getBoolean("unlocked.end", false);
         milestonesInitialized = yaml.getBoolean("milestones.initialized", false);
+        requirementsInitialized = yaml.getBoolean("requirements.initialized", false);
 
         contributions.clear();
         ConfigurationSection root = yaml.getConfigurationSection("contributions");
@@ -94,6 +98,17 @@ public final class ProgressionDataStore {
                 }
             }
         }
+
+        for (ProgressStage stage : ProgressStage.values()) {
+            Map<String, Long> values = requirementProgress.computeIfAbsent(stage, ignored -> new HashMap<>());
+            values.clear();
+            ConfigurationSection requirementRoot = yaml.getConfigurationSection("requirements.progress." + stage.key());
+            if (requirementRoot == null) continue;
+            for (String id : requirementRoot.getKeys(false)) {
+                long amount = Math.max(0L, requirementRoot.getLong(id, 0L));
+                if (amount > 0L) values.put(id.toLowerCase(), amount);
+            }
+        }
         dirty = false;
     }
 
@@ -114,6 +129,7 @@ public final class ProgressionDataStore {
         yaml.set("unlocked.nether", netherUnlocked);
         yaml.set("unlocked.end", endUnlocked);
         yaml.set("milestones.initialized", milestonesInitialized);
+        yaml.set("requirements.initialized", requirementsInitialized);
 
         for (ProgressStage stage : ProgressStage.values()) {
             List<Integer> claimed = new ArrayList<>(claimedMilestones.getOrDefault(stage, Set.of()));
@@ -137,6 +153,14 @@ public final class ProgressionDataStore {
                 List<Long> sorted = new ArrayList<>(values);
                 sorted.sort(Long::compareTo);
                 yaml.set("personal-goals.rewarded." + entry.getKey() + "." + stage.key(), sorted);
+            }
+        }
+
+        for (ProgressStage stage : ProgressStage.values()) {
+            for (Map.Entry<String, Long> entry : requirementProgress.getOrDefault(stage, Map.of()).entrySet()) {
+                if (entry.getValue() > 0L) {
+                    yaml.set("requirements.progress." + stage.key() + "." + entry.getKey(), entry.getValue());
+                }
             }
         }
 
@@ -203,6 +227,45 @@ public final class ProgressionDataStore {
         dirty = true;
     }
 
+    public boolean requirementsInitialized() {
+        return requirementsInitialized;
+    }
+
+    public void setRequirementsInitialized(boolean value) {
+        requirementsInitialized = value;
+        dirty = true;
+    }
+
+    public long getRequirementProgress(ProgressStage stage, String requirementId) {
+        if (stage == null || requirementId == null) return 0L;
+        return requirementProgress.getOrDefault(stage, Map.of()).getOrDefault(requirementId.toLowerCase(), 0L);
+    }
+
+    public void setRequirementProgress(ProgressStage stage, String requirementId, long value) {
+        if (stage == null || requirementId == null || requirementId.isBlank()) return;
+        Map<String, Long> values = requirementProgress.computeIfAbsent(stage, ignored -> new HashMap<>());
+        String key = requirementId.toLowerCase();
+        long normalized = Math.max(0L, value);
+        if (normalized == 0L) values.remove(key);
+        else values.put(key, normalized);
+        dirty = true;
+    }
+
+    public long addRequirementProgress(ProgressStage stage, String requirementId, long amount) {
+        long result = Math.max(0L, getRequirementProgress(stage, requirementId) + amount);
+        setRequirementProgress(stage, requirementId, result);
+        return result;
+    }
+
+    public Map<String, Long> requirementProgress(ProgressStage stage) {
+        return Map.copyOf(requirementProgress.getOrDefault(stage, Map.of()));
+    }
+
+    public void clearRequirementProgress(ProgressStage stage) {
+        requirementProgress.computeIfAbsent(stage, ignored -> new HashMap<>()).clear();
+        dirty = true;
+    }
+
     public boolean isPersonalGoalRewarded(UUID uuid, ProgressStage stage, long goal) {
         EnumMap<ProgressStage, Set<Long>> byStage = rewardedPersonalGoals.get(uuid);
         if (byStage == null) return false;
@@ -237,17 +300,22 @@ public final class ProgressionDataStore {
             values.remove(stage);
         }
         rewardedPersonalGoals.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+        clearRequirementProgress(stage);
         dirty = true;
     }
 
     public void resetAll() {
-        for (ProgressStage stage : ProgressStage.values()) totals.put(stage, 0L);
+        for (ProgressStage stage : ProgressStage.values()) {
+            totals.put(stage, 0L);
+            requirementProgress.computeIfAbsent(stage, ignored -> new HashMap<>()).clear();
+        }
         contributions.clear();
         for (Set<Integer> values : claimedMilestones.values()) values.clear();
         rewardedPersonalGoals.clear();
         netherUnlocked = false;
         endUnlocked = false;
         milestonesInitialized = true;
+        requirementsInitialized = true;
         dirty = true;
     }
 

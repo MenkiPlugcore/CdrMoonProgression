@@ -26,6 +26,7 @@ import java.util.Map;
 
 public final class ProgressMenu implements Listener {
     private static final int RESOURCE_PAGE_SIZE = 45;
+    private static final int REQUIREMENT_PAGE_SIZE = 45;
 
     private final CdrMoonProgressionPlugin plugin;
     private final ProgressionService service;
@@ -72,12 +73,8 @@ public final class ProgressMenu implements Listener {
                         "&eKlik untuk mulai setor."
                 )));
 
-        inventory.setItem(36, item(data.isNetherUnlocked() ? Material.OBSIDIAN : Material.CRYING_OBSIDIAN,
-                data.isNetherUnlocked() ? "&aThe Nether: UNLOCKED" : "&cThe Nether: LOCKED",
-                List.of("&7Target Overworld: &f" + format(service.target(ProgressStage.OVERWORLD)) + " poin")));
-        inventory.setItem(44, item(data.isEndUnlocked() ? Material.END_PORTAL_FRAME : Material.ENDER_EYE,
-                data.isEndUnlocked() ? "&aThe End: UNLOCKED" : "&cThe End: LOCKED",
-                List.of("&7Target Nether: &f" + format(service.target(ProgressStage.NETHER)) + " poin")));
+        inventory.setItem(36, dimensionStatusItem(ProgressStage.OVERWORLD, data.isNetherUnlocked(), "The Nether"));
+        inventory.setItem(44, dimensionStatusItem(ProgressStage.NETHER, data.isEndUnlocked(), "The End"));
 
         inventory.setItem(40, item(Material.BARRIER, "&cTutup", List.of("&7Tutup menu progression.")));
         player.openInventory(inventory);
@@ -98,10 +95,11 @@ public final class ProgressMenu implements Listener {
             boolean reached = percent + 0.0001 >= threshold;
             Material material = reached ? Material.LIME_STAINED_GLASS_PANE : Material.BLACK_STAINED_GLASS_PANE;
             inventory.setItem(18 + i, item(material,
-                    reached ? "&aProgress" : "&8Belum tercapai",
+                    reached ? "&aProgress Point" : "&8Belum tercapai",
                     List.of("&f" + String.format(Locale.US, "%.1f", percent) + "%", "&7" + format(current) + " / " + format(target))));
         }
 
+        inventory.setItem(28, requirementSummaryItem(stage));
         inventory.setItem(30, item(Material.PLAYER_HEAD, "&bKontribusi Kamu", List.of(
                 "&f" + format(data.getContribution(player.getUniqueId(), stage)) + " poin",
                 "",
@@ -133,6 +131,42 @@ public final class ProgressMenu implements Listener {
         player.openInventory(inventory);
     }
 
+    public void openRequirements(Player player, ProgressStage stage, int requestedPage) {
+        List<ProgressionService.ResourceRequirement> requirements = service.requirements(stage);
+        int maxPage = Math.max(0, (requirements.size() - 1) / REQUIREMENT_PAGE_SIZE);
+        int page = Math.max(0, Math.min(maxPage, requestedPage));
+
+        Inventory inventory = create(MenuType.REQUIREMENTS, stage, page, null, 54, "&8Requirements • " + stage.displayName());
+        fill(inventory, Material.GRAY_STAINED_GLASS_PANE);
+
+        int from = page * REQUIREMENT_PAGE_SIZE;
+        int to = Math.min(requirements.size(), from + REQUIREMENT_PAGE_SIZE);
+        for (int i = from; i < to; i++) {
+            ProgressionService.ResourceRequirement requirement = requirements.get(i);
+            inventory.setItem(i - from, requirementItem(stage, requirement));
+        }
+
+        if (requirements.isEmpty()) {
+            inventory.setItem(22, item(Material.PAPER, "&7Tidak ada resource requirement", List.of(
+                    service.requirementsEnabled() ? "&8Stage hanya membutuhkan target poin." : "&8Resource Requirements sedang disabled."
+            )));
+        }
+
+        inventory.setItem(45, item(Material.ARROW, "&eKembali", List.of("&7Kembali ke detail stage.")));
+        if (page > 0) inventory.setItem(48, item(Material.SPECTRAL_ARROW, "&eHalaman Sebelumnya", List.of()));
+        inventory.setItem(49, item(service.requirementsSatisfied(stage) ? Material.LIME_DYE : Material.CHEST,
+                service.requirementsSatisfied(stage) ? "&a&lSEMUA REQUIREMENT SELESAI" : "&e&lRESOURCE REQUIREMENTS",
+                List.of(
+                        "&7Selesai: &f" + service.completedRequirementCount(stage) + "&7/&f" + service.totalRequirementCount(stage),
+                        "&7Target poin: " + (data.getTotal(stage) >= service.target(stage) ? "&aSELESAI" : "&cBELUM"),
+                        "",
+                        service.stageComplete(stage) ? "&aStage siap membuka dimension." : "&7Poin + seluruh requirement wajib selesai."
+                )));
+        if (page < maxPage) inventory.setItem(50, item(Material.SPECTRAL_ARROW, "&eHalaman Berikutnya", List.of()));
+        inventory.setItem(53, item(Material.BARRIER, "&cTutup", List.of("&7Tutup menu progression.")));
+        player.openInventory(inventory);
+    }
+
     public void openDepositResources(Player player, ProgressStage stage, int requestedPage) {
         if (!service.isStageActive(stage)) {
             player.sendActionBar(Component.text("Stage ini tidak menerima setoran.", NamedTextColor.RED));
@@ -151,14 +185,30 @@ public final class ProgressMenu implements Listener {
         int to = Math.min(entries.size(), from + RESOURCE_PAGE_SIZE);
         for (int i = from; i < to; i++) {
             Map.Entry<Material, Integer> entry = entries.get(i);
-            int owned = service.countDepositable(player, entry.getKey());
-            inventory.setItem(i - from, item(entry.getKey(), "&f" + pretty(entry.getKey()), List.of(
-                    "&7Nilai: &b&l+" + entry.getValue() + " poin &7/ item",
-                    "&7Kamu punya: &f" + format(owned),
-                    "",
-                    owned > 0 ? "&eKlik untuk pilih jumlah setoran." : "&8Resource tidak tersedia di inventory.",
-                    "&8Item custom/named tidak akan diambil."
-            )));
+            Material material = entry.getKey();
+            int owned = service.countDepositable(player, material);
+            long useful = service.usefulDepositItems(stage, material, owned);
+            List<String> lore = new ArrayList<>();
+            lore.add("&7Nilai: &b&l+" + entry.getValue() + " poin &7/ item");
+            lore.add("&7Kamu punya: &f" + format(owned));
+
+            List<ProgressionService.ResourceRequirement> matching = service.matchingRequirements(stage, material);
+            if (!matching.isEmpty()) {
+                lore.add("");
+                lore.add("&eResource Requirement:");
+                for (ProgressionService.ResourceRequirement requirement : matching) {
+                    long progress = service.requirementProgress(stage, requirement);
+                    lore.add("&7• " + requirement.name() + ": &f" + format(progress) + "&7/&f" + format(requirement.target()));
+                }
+            }
+
+            lore.add("");
+            if (owned <= 0) lore.add("&8Resource tidak tersedia di inventory.");
+            else if (useful <= 0L) lore.add("&aResource ini sudah tidak dibutuhkan.");
+            else lore.add("&eKlik untuk pilih jumlah setoran.");
+            lore.add("&8Item custom/named tidak akan diambil.");
+
+            inventory.setItem(i - from, item(material, "&f" + pretty(material), lore));
         }
 
         inventory.setItem(45, item(Material.ARROW, "&eKembali", List.of("&7Kembali ke detail stage.")));
@@ -169,7 +219,8 @@ public final class ProgressMenu implements Listener {
                 "&b" + stage.displayName(), List.of(
                         "&7Halaman &f" + (page + 1) + "&7/&f" + (maxPage + 1),
                         "&7Resource: &f" + entries.size(),
-                        "&7Progress: &f" + format(data.getTotal(stage)) + "/" + format(service.target(stage))
+                        "&7Points: &f" + format(data.getTotal(stage)) + "/" + format(service.target(stage)),
+                        "&7Requirements: &f" + service.completedRequirementCount(stage) + "/" + service.totalRequirementCount(stage)
                 )));
         if (page < maxPage) {
             inventory.setItem(50, item(Material.SPECTRAL_ARROW, "&eHalaman Berikutnya", List.of("&7Halaman " + (page + 2) + "/" + (maxPage + 1))));
@@ -193,23 +244,26 @@ public final class ProgressMenu implements Listener {
 
         int owned = service.countDepositable(player, material);
         long remainingPoints = Math.max(0L, service.target(stage) - data.getTotal(stage));
-        long useful = Math.min(owned, (remainingPoints + value - 1L) / value);
+        long useful = service.usefulDepositItems(stage, material, owned);
 
         Inventory inventory = create(MenuType.DEPOSIT_AMOUNT, stage, returnPage, material, 27, "&8Jumlah Setoran");
         fill(inventory, Material.GRAY_STAINED_GLASS_PANE);
 
-        inventory.setItem(4, item(material, "&b&l" + pretty(material), List.of(
-                "&7Nilai: &f" + value + " poin / item",
-                "&7Kamu punya: &f" + format(owned),
-                "&7Maks. berguna: &f" + format(useful),
-                "",
-                "&7Sisa target: &f" + format(remainingPoints) + " poin"
-        )));
+        List<String> info = new ArrayList<>();
+        info.add("&7Nilai: &f" + value + " poin / item");
+        info.add("&7Kamu punya: &f" + format(owned));
+        info.add("&7Maks. berguna: &f" + format(useful));
+        info.add("&7Sisa target point: &f" + format(remainingPoints));
+        for (ProgressionService.ResourceRequirement requirement : service.matchingRequirements(stage, material)) {
+            long current = service.requirementProgress(stage, requirement);
+            info.add("&7" + requirement.name() + ": &f" + format(current) + "&7/&f" + format(requirement.target()));
+        }
+        inventory.setItem(4, item(material, "&b&l" + pretty(material), info));
 
-        inventory.setItem(10, depositButton(Material.IRON_NUGGET, "&aSetor 1", 1, owned, value));
-        inventory.setItem(12, depositButton(Material.IRON_INGOT, "&aSetor 16", 16, owned, value));
-        inventory.setItem(14, depositButton(Material.IRON_BLOCK, "&aSetor 64", 64, owned, value));
-        inventory.setItem(16, depositAllButton(owned, value));
+        inventory.setItem(10, depositButton(Material.IRON_NUGGET, "&aSetor 1", 1, owned, useful, value));
+        inventory.setItem(12, depositButton(Material.IRON_INGOT, "&aSetor 16", 16, owned, useful, value));
+        inventory.setItem(14, depositButton(Material.IRON_BLOCK, "&aSetor 64", 64, owned, useful, value));
+        inventory.setItem(16, depositAllButton(owned, useful, value));
 
         inventory.setItem(22, item(Material.ARROW, "&eKembali", List.of("&7Kembali ke daftar resource.")));
         inventory.setItem(26, item(Material.BARRIER, "&cTutup", List.of("&7Tutup menu progression.")));
@@ -272,6 +326,7 @@ public final class ProgressMenu implements Listener {
         switch (holder.type) {
             case MAIN -> handleMain(player, slot);
             case STAGE -> handleStage(player, holder.stage, slot);
+            case REQUIREMENTS -> handleRequirements(player, holder.stage, holder.page, slot);
             case DEPOSIT_RESOURCES -> handleDepositResources(player, holder.stage, holder.page, slot);
             case DEPOSIT_AMOUNT -> handleDepositAmount(player, holder.stage, holder.material, holder.page, slot);
             case LEADERBOARD -> handleLeaderboard(player, holder.stage, slot);
@@ -296,9 +351,18 @@ public final class ProgressMenu implements Listener {
 
     private void handleStage(Player player, ProgressStage stage, int slot) {
         if (stage == null) return;
-        if (slot == 32) openLeaderboard(player, stage);
+        if (slot == 28) openRequirements(player, stage, 0);
+        else if (slot == 32) openLeaderboard(player, stage);
         else if (slot == 34 && service.isStageActive(stage)) openDepositResources(player, stage, 0);
         else if (slot == 45) openMain(player);
+        else if (slot == 53) player.closeInventory();
+    }
+
+    private void handleRequirements(Player player, ProgressStage stage, int page, int slot) {
+        if (stage == null) return;
+        if (slot == 45) openStage(player, stage);
+        else if (slot == 48 && page > 0) openRequirements(player, stage, page - 1);
+        else if (slot == 50) openRequirements(player, stage, page + 1);
         else if (slot == 53) player.closeInventory();
     }
 
@@ -310,8 +374,13 @@ public final class ProgressMenu implements Listener {
             int index = page * RESOURCE_PAGE_SIZE + slot;
             if (index >= 0 && index < entries.size()) {
                 Material material = entries.get(index).getKey();
-                if (service.countDepositable(player, material) <= 0) {
+                int owned = service.countDepositable(player, material);
+                if (owned <= 0) {
                     player.sendActionBar(Component.text("Kamu tidak punya resource vanilla itu di inventory.", NamedTextColor.RED));
+                    return;
+                }
+                if (service.usefulDepositItems(stage, material, owned) <= 0L) {
+                    player.sendActionBar(Component.text("Resource ini sudah tidak dibutuhkan untuk stage ini.", NamedTextColor.GREEN));
                     return;
                 }
                 openDepositAmount(player, stage, material, page);
@@ -357,7 +426,7 @@ public final class ProgressMenu implements Listener {
 
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8f, 1.25f);
         player.sendActionBar(Component.text(
-                "Setor " + result.itemsConsumed() + "x " + pretty(material) + " • +" + format(result.pointsAdded()) + " poin",
+                "Setor " + result.itemsConsumed() + "x " + pretty(material) + " • +" + format(result.pointsAdded()) + " kontribusi",
                 NamedTextColor.GREEN));
 
         if (service.isStageActive(stage)) openDepositAmount(player, stage, material, returnPage);
@@ -383,22 +452,25 @@ public final class ProgressMenu implements Listener {
         return entries;
     }
 
-    private ItemStack depositButton(Material icon, String name, int amount, int owned, int value) {
-        int actual = Math.min(amount, owned);
+    private ItemStack depositButton(Material icon, String name, int amount, int owned, long useful, int value) {
+        long actual = Math.min(Math.min((long) amount, owned), useful);
         return item(icon, name, List.of(
                 "&7Item tersedia: &f" + format(owned),
-                "&7Maks. poin: &b+" + format((long) actual * value),
+                "&7Akan dipakai maks.: &f" + format(actual),
+                "&7Nilai kontribusi: &b+" + format(actual * value),
                 "",
-                owned > 0 ? "&eKlik untuk setor." : "&cResource tidak cukup."
+                actual > 0 ? "&eKlik untuk setor." : "&cResource tidak dibutuhkan."
         ));
     }
 
-    private ItemStack depositAllButton(int owned, int value) {
-        return item(Material.HOPPER, "&a&lSetor Semua", List.of(
+    private ItemStack depositAllButton(int owned, long useful, int value) {
+        long actual = Math.min(owned, useful);
+        return item(Material.HOPPER, "&a&lSetor Semua yang Dibutuhkan", List.of(
                 "&7Item tersedia: &f" + format(owned),
-                "&7Maks. poin: &b+" + format((long) owned * value),
+                "&7Akan dipakai maks.: &f" + format(actual),
+                "&7Nilai kontribusi: &b+" + format(actual * value),
                 "",
-                owned > 0 ? "&eKlik untuk setor seluruh resource." : "&cResource tidak tersedia."
+                actual > 0 ? "&eKlik untuk setor resource yang masih berguna." : "&cResource tidak dibutuhkan."
         ));
     }
 
@@ -408,8 +480,50 @@ public final class ProgressMenu implements Listener {
             case "inactive-stage", "completed" -> "Stage ini sudah tidak menerima setoran.";
             case "no-items" -> "Resource tidak tersedia di inventory.";
             case "invalid-resource" -> "Resource ini tidak dapat disetor.";
+            case "not-needed" -> "Resource ini sudah tidak dibutuhkan untuk stage ini.";
             default -> "Setoran gagal diproses.";
         };
+    }
+
+    private ItemStack dimensionStatusItem(ProgressStage stage, boolean unlocked, String dimension) {
+        List<String> lore = new ArrayList<>();
+        lore.add("&7Points: &f" + format(data.getTotal(stage)) + "&7/&f" + format(service.target(stage)));
+        lore.add("&7Requirements: &f" + service.completedRequirementCount(stage) + "&7/&f" + service.totalRequirementCount(stage));
+        lore.add("");
+        lore.add(unlocked ? "&aSemua syarat telah selesai." : "&7Points dan resource requirement wajib selesai.");
+        Material icon = stage == ProgressStage.OVERWORLD
+                ? (unlocked ? Material.OBSIDIAN : Material.CRYING_OBSIDIAN)
+                : (unlocked ? Material.END_PORTAL_FRAME : Material.ENDER_EYE);
+        return item(icon, unlocked ? "&a" + dimension + ": UNLOCKED" : "&c" + dimension + ": LOCKED", lore);
+    }
+
+    private ItemStack requirementSummaryItem(ProgressStage stage) {
+        int complete = service.completedRequirementCount(stage);
+        int total = service.totalRequirementCount(stage);
+        boolean done = service.requirementsSatisfied(stage);
+        return item(done ? Material.LIME_DYE : Material.CHEST,
+                done ? "&a&lResource Requirements Selesai" : "&e&lResource Requirements",
+                List.of(
+                        "&7Selesai: &f" + complete + "&7/&f" + total,
+                        "&7Status: " + (done ? "&aCOMPLETE" : "&cINCOMPLETE"),
+                        "",
+                        "&eKlik untuk lihat checklist resource."
+                ));
+    }
+
+    private ItemStack requirementItem(ProgressStage stage, ProgressionService.ResourceRequirement requirement) {
+        long current = service.requirementProgress(stage, requirement);
+        boolean complete = current >= requirement.target();
+        List<String> lore = new ArrayList<>();
+        lore.add("&7Progress: &f" + format(current) + "&7/&f" + format(requirement.target()));
+        lore.add("&7Persentase: &f" + String.format(Locale.US, "%.1f%%", service.requirementPercent(stage, requirement)));
+        lore.add("&7Status: " + (complete ? "&aCOMPLETE" : "&cINCOMPLETE"));
+        lore.add("");
+        lore.add("&7Material yang diterima:");
+        for (Material material : requirement.materials()) {
+            lore.add("&8• &f" + pretty(material));
+        }
+        return item(requirement.icon(), requirement.name(), lore);
     }
 
     private ItemStack stageItem(ProgressStage stage, Player player) {
@@ -421,8 +535,9 @@ public final class ProgressMenu implements Listener {
 
         return item(material, "&b&l" + stage.displayName(), List.of(
                 "&7Status: " + status(stage),
-                "&7Progress: &f" + format(current) + "&7/&f" + format(target),
-                "&7Persentase: &f" + String.format(Locale.US, "%.1f%%", percent),
+                "&7Points: &f" + format(current) + "&7/&f" + format(target),
+                "&7Persentase point: &f" + String.format(Locale.US, "%.1f%%", percent),
+                "&7Requirements: &f" + service.completedRequirementCount(stage) + "&7/&f" + service.totalRequirementCount(stage),
                 "&7Kontribusi kamu: &b" + format(data.getContribution(player.getUniqueId(), stage)),
                 "",
                 "&7Tujuan unlock: &f" + destination,
@@ -433,7 +548,8 @@ public final class ProgressMenu implements Listener {
     private ItemStack activeStageItem(Player player) {
         return service.activeStage().map(stage -> item(Material.COMPASS, "&e&lExpedition Aktif", List.of(
                 "&7Stage: &f" + stage.displayName(),
-                "&7Progress: &f" + String.format(Locale.US, "%.1f%%", service.percent(stage)),
+                "&7Points: &f" + String.format(Locale.US, "%.1f%%", service.percent(stage)),
+                "&7Requirements: &f" + service.completedRequirementCount(stage) + "&7/&f" + service.totalRequirementCount(stage),
                 "&7Kontribusi kamu: &b" + format(data.getContribution(player.getUniqueId(), stage)),
                 "",
                 "&eKlik untuk membuka stage."
@@ -447,7 +563,8 @@ public final class ProgressMenu implements Listener {
         return item(stage == ProgressStage.OVERWORLD ? Material.GRASS_BLOCK : Material.NETHERRACK,
                 "&b" + stage.displayName(), List.of(
                         "&7Kontribusi: &f" + format(data.getContribution(player.getUniqueId(), stage)) + " poin",
-                        "&7Global: &f" + format(data.getTotal(stage)) + "/" + format(service.target(stage)),
+                        "&7Global points: &f" + format(data.getTotal(stage)) + "/" + format(service.target(stage)),
+                        "&7Requirements: &f" + service.completedRequirementCount(stage) + "/" + service.totalRequirementCount(stage),
                         "",
                         "&eKlik untuk detail stage."
                 ));
@@ -512,6 +629,7 @@ public final class ProgressMenu implements Listener {
     private enum MenuType {
         MAIN,
         STAGE,
+        REQUIREMENTS,
         DEPOSIT_RESOURCES,
         DEPOSIT_AMOUNT,
         LEADERBOARD,
