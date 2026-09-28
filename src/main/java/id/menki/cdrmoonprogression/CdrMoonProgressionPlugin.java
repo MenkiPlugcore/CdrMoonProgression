@@ -12,6 +12,8 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        getConfig().options().copyDefaults(true);
+        saveConfig();
 
         dataStore = new ProgressionDataStore(this);
         dataStore.load();
@@ -52,6 +54,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         }
 
         getLogger().info("CdrMoonProgression v" + getPluginMeta().getVersion() + " enabled.");
+        getLogger().info("Progress mode: GUI DEPOSIT ONLY (block break does not add points).");
         getLogger().info("Overworld: " + dataStore.getTotal(ProgressStage.OVERWORLD) + "/" + progressionService.target(ProgressStage.OVERWORLD)
                 + " | Nether: " + dataStore.getTotal(ProgressStage.NETHER) + "/" + progressionService.target(ProgressStage.NETHER));
     }
