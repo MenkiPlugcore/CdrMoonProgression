@@ -39,12 +39,12 @@ public final class ContributionHistoryStore {
         for (var raw : yaml.getMapList("entries")) {
             try {
                 UUID playerId = UUID.fromString(String.valueOf(raw.get("player-uuid")));
-                String playerName = String.valueOf(raw.getOrDefault("player-name", "Unknown"));
+                String playerName = String.valueOf(raw.containsKey("player-name") ? raw.get("player-name") : "Unknown");
                 ProgressStage stage = ProgressStage.parse(String.valueOf(raw.get("stage"))).orElse(null);
                 Material material = Material.matchMaterial(String.valueOf(raw.get("material")));
-                int items = Integer.parseInt(String.valueOf(raw.getOrDefault("items", 0)));
-                long points = Long.parseLong(String.valueOf(raw.getOrDefault("points", 0)));
-                long timestamp = Long.parseLong(String.valueOf(raw.getOrDefault("timestamp", 0)));
+                int items = Integer.parseInt(String.valueOf(raw.containsKey("items") ? raw.get("items") : 0));
+                long points = Long.parseLong(String.valueOf(raw.containsKey("points") ? raw.get("points") : 0));
+                long timestamp = Long.parseLong(String.valueOf(raw.containsKey("timestamp") ? raw.get("timestamp") : 0));
                 if (stage == null || material == null || items <= 0 || points <= 0 || timestamp <= 0) continue;
                 entries.add(new Entry(playerId, playerName, stage, material, items, points, timestamp));
             } catch (Exception ex) {
