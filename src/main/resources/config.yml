@@ -1,0 +1,70 @@
+# CdrMoonProgression v0.1.0
+# Paper 1.21.11 / Java 21
+
+progression:
+  overworld:
+    target: 50000
+    blocks:
+      COAL_ORE: 1
+      DEEPSLATE_COAL_ORE: 1
+      COPPER_ORE: 1
+      DEEPSLATE_COPPER_ORE: 1
+      IRON_ORE: 3
+      DEEPSLATE_IRON_ORE: 3
+      GOLD_ORE: 5
+      DEEPSLATE_GOLD_ORE: 5
+      REDSTONE_ORE: 2
+      DEEPSLATE_REDSTONE_ORE: 2
+      LAPIS_ORE: 3
+      DEEPSLATE_LAPIS_ORE: 3
+      EMERALD_ORE: 8
+      DEEPSLATE_EMERALD_ORE: 8
+      DIAMOND_ORE: 10
+      DEEPSLATE_DIAMOND_ORE: 10
+      OAK_LOG: 1
+      SPRUCE_LOG: 1
+      BIRCH_LOG: 1
+      JUNGLE_LOG: 1
+      ACACIA_LOG: 1
+      DARK_OAK_LOG: 1
+      MANGROVE_LOG: 1
+      CHERRY_LOG: 1
+    unlock-commands: []
+
+  nether:
+    target: 70000
+    blocks:
+      NETHERRACK: 1
+      SOUL_SAND: 2
+      SOUL_SOIL: 2
+      NETHER_QUARTZ_ORE: 4
+      NETHER_GOLD_ORE: 4
+      BLACKSTONE: 2
+      BASALT: 2
+      BONE_BLOCK: 5
+      GLOWSTONE: 3
+      ANCIENT_DEBRIS: 25
+    unlock-commands: []
+
+# Jika list kosong, plugin memakai World.Environment sebagai fallback.
+# Isi nama world bila setup Multiverse/custom dimension ingin dibuat eksplisit.
+worlds:
+  overworld: []
+  nether: []
+  end: []
+
+anti-exploit:
+  count-only-survival: true
+  track-player-placed-blocks: true
+
+# Mencegah portal, command teleport, dan teleport plugin menuju dimension terkunci.
+dimension-lock:
+  enabled: true
+
+messages:
+  prefix: '&8[&bMoon Progress&8]&r '
+  locked-nether: '&cNether masih terkunci! &7Progress Overworld: &f{current}/{target} &7({percent}%)'
+  locked-end: '&cThe End masih terkunci! &7Progress Nether: &f{current}/{target} &7({percent}%)'
+  unlock-broadcast: '&b&lDIMENSION UNLOCKED! &f{dimension} &7sekarang dapat diakses.'
+  unlock-title: '&b&lDIMENSION UNLOCKED'
+  unlock-subtitle: '&f{dimension} &7telah terbuka!'

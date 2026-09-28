@@ -1,0 +1,26 @@
+name: CdrMoonProgression
+version: 0.1.0-SNAPSHOT
+main: id.menki.cdrmoonprogression.CdrMoonProgressionPlugin
+api-version: '1.21'
+authors: [Cadera]
+description: Community dimension progression system for Moonsign.
+softdepend: [PlaceholderAPI]
+
+commands:
+  progress:
+    description: Lihat progress dimensi dan kontribusi player.
+    usage: /progress [top] [overworld|nether]
+    aliases: [dimprogress, moonprogress]
+  progressadmin:
+    description: Administrasi CdrMoonProgression.
+    usage: /progressadmin <status|add|set|reset|unlock|lock|reload|save>
+    aliases: [pa, moonprogressadmin]
+    permission: cdrmoonprogression.admin
+
+permissions:
+  cdrmoonprogression.admin:
+    description: Akses penuh command admin progression.
+    default: op
+  cdrmoonprogression.bypass.dimension:
+    description: Bypass dimension lock.
+    default: op
