@@ -10,6 +10,7 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,6 +23,7 @@ public final class ProgressionService {
     private final ProgressionDataStore data;
     private final EnumMap<ProgressStage, Long> targets = new EnumMap<>(ProgressStage.class);
     private final EnumMap<ProgressStage, Map<Material, Integer>> depositValues = new EnumMap<>(ProgressStage.class);
+    private final EnumMap<ProgressStage, List<Milestone>> milestones = new EnumMap<>(ProgressStage.class);
 
     private List<String> overworldWorlds = List.of();
     private List<String> netherWorlds = List.of();
@@ -37,6 +39,7 @@ public final class ProgressionService {
     public void reloadFromConfig() {
         targets.clear();
         depositValues.clear();
+        milestones.clear();
 
         for (ProgressStage stage : ProgressStage.values()) {
             long defaultTarget = stage == ProgressStage.OVERWORLD ? 50_000L : 70_000L;
@@ -57,12 +60,69 @@ public final class ProgressionService {
                 }
             }
             depositValues.put(stage, values);
+            milestones.put(stage, loadMilestones(stage));
         }
 
         overworldWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.overworld"));
         netherWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.nether"));
         endWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.end"));
         dimensionLockEnabled = plugin.getConfig().getBoolean("dimension-lock.enabled", true);
+
+        initializeMilestoneState();
+    }
+
+    private List<Milestone> loadMilestones(ProgressStage stage) {
+        List<Milestone> result = new ArrayList<>();
+        ConfigurationSection root = plugin.getConfig().getConfigurationSection("milestones." + stage.key());
+        if (root == null) return List.of();
+
+        for (String rawPercent : root.getKeys(false)) {
+            int percent;
+            try {
+                percent = Integer.parseInt(rawPercent);
+            } catch (NumberFormatException ex) {
+                plugin.getLogger().warning("Milestone invalid untuk " + stage.key() + ": " + rawPercent);
+                continue;
+            }
+            if (percent <= 0 || percent > 100) {
+                plugin.getLogger().warning("Milestone harus 1-100: " + stage.key() + "." + rawPercent);
+                continue;
+            }
+
+            String path = "milestones." + stage.key() + "." + rawPercent;
+            String name = plugin.getConfig().getString(path + ".name", "&bMilestone " + percent + "%");
+            Material icon = Material.matchMaterial(plugin.getConfig().getString(path + ".icon", "CHEST"));
+            if (icon == null || icon.isAir()) icon = Material.CHEST;
+            List<String> lore = List.copyOf(plugin.getConfig().getStringList(path + ".lore"));
+            List<String> commands = List.copyOf(plugin.getConfig().getStringList(path + ".commands"));
+            String broadcast = plugin.getConfig().getString(path + ".broadcast", "");
+            String title = plugin.getConfig().getString(path + ".title", "");
+            String subtitle = plugin.getConfig().getString(path + ".subtitle", "");
+            result.add(new Milestone(percent, name, icon, lore, commands, broadcast, title, subtitle));
+        }
+
+        result.sort(Comparator.comparingInt(Milestone::percent));
+        return List.copyOf(result);
+    }
+
+    private void initializeMilestoneState() {
+        if (data.milestonesInitialized()) return;
+
+        boolean rewardExisting = plugin.getConfig().getBoolean("milestones.reward-existing-progress-on-first-load", false);
+        for (ProgressStage stage : ProgressStage.values()) {
+            if (rewardExisting) {
+                processMilestones(stage);
+            } else {
+                double currentPercent = percent(stage);
+                for (Milestone milestone : milestones(stage)) {
+                    if (currentPercent + 0.0001D >= milestone.percent()) {
+                        data.markMilestoneClaimed(stage, milestone.percent());
+                    }
+                }
+            }
+        }
+        data.setMilestonesInitialized(true);
+        data.save();
     }
 
     private List<String> normalizeWorldList(List<String> input) {
@@ -184,6 +244,17 @@ public final class ProgressionService {
         return activeStage().map(active -> active == stage).orElse(false);
     }
 
+    public List<Milestone> milestones(ProgressStage stage) {
+        return milestones.getOrDefault(stage, List.of());
+    }
+
+    public Optional<Milestone> nextMilestone(ProgressStage stage) {
+        for (Milestone milestone : milestones(stage)) {
+            if (!data.isMilestoneClaimed(stage, milestone.percent())) return Optional.of(milestone);
+        }
+        return Optional.empty();
+    }
+
     public long addProgress(ProgressStage stage, long requested, UUID contributor) {
         if (requested <= 0) return 0L;
         long current = data.getTotal(stage);
@@ -194,13 +265,59 @@ public final class ProgressionService {
 
         data.setTotal(stage, next);
         if (contributor != null) data.addContribution(contributor, stage, actual);
+        processMilestones(stage);
         checkUnlock(stage);
         return actual;
     }
 
     public void setProgress(ProgressStage stage, long value) {
         data.setTotal(stage, Math.min(target(stage), Math.max(0L, value)));
+        processMilestones(stage);
         checkUnlock(stage);
+    }
+
+    private void processMilestones(ProgressStage stage) {
+        double currentPercent = percent(stage);
+        for (Milestone milestone : milestones(stage)) {
+            if (currentPercent + 0.0001D < milestone.percent()) continue;
+            if (data.isMilestoneClaimed(stage, milestone.percent())) continue;
+
+            data.markMilestoneClaimed(stage, milestone.percent());
+            data.save();
+            executeMilestone(stage, milestone);
+        }
+    }
+
+    private void executeMilestone(ProgressStage stage, Milestone milestone) {
+        String broadcast = placeholders(milestone.broadcast(), stage, milestone);
+        if (!broadcast.isBlank()) Bukkit.broadcastMessage(plugin.color(broadcast));
+
+        String title = plugin.color(placeholders(milestone.title(), stage, milestone));
+        String subtitle = plugin.color(placeholders(milestone.subtitle(), stage, milestone));
+        if (!title.isBlank() || !subtitle.isBlank()) {
+            for (Player online : Bukkit.getOnlinePlayers()) {
+                online.sendTitle(title, subtitle, 10, 60, 15);
+            }
+        }
+
+        for (String rawCommand : milestone.commands()) {
+            String command = placeholders(rawCommand, stage, milestone).replaceFirst("^/", "");
+            if (command.isBlank()) continue;
+            boolean accepted = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+            if (!accepted) {
+                plugin.getLogger().warning("Milestone command tidak dikenali: " + command);
+            }
+        }
+    }
+
+    private String placeholders(String input, ProgressStage stage, Milestone milestone) {
+        if (input == null) return "";
+        return input
+                .replace("{stage}", stage.displayName())
+                .replace("{stage_key}", stage.key())
+                .replace("{percent}", Integer.toString(milestone.percent()))
+                .replace("{current}", Long.toString(data.getTotal(stage)))
+                .replace("{target}", Long.toString(target(stage)));
     }
 
     private void checkUnlock(ProgressStage stage) {
@@ -262,6 +379,9 @@ public final class ProgressionService {
     public boolean dimensionLockEnabled() {
         return dimensionLockEnabled;
     }
+
+    public record Milestone(int percent, String name, Material icon, List<String> lore, List<String> commands,
+                            String broadcast, String title, String subtitle) {}
 
     public record DepositResult(boolean success, int itemsConsumed, long pointsAdded, int pointValue,
                                 int remainingItems, String reason) {
