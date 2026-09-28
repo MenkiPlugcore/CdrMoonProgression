@@ -29,7 +29,10 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         ProgressMenu progressMenu = new ProgressMenu(this, progressionService, dataStore);
         getServer().getPluginManager().registerEvents(progressMenu, this);
 
-        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore, progressMenu);
+        MilestoneMenu milestoneMenu = new MilestoneMenu(this, progressionService, dataStore, progressMenu);
+        getServer().getPluginManager().registerEvents(milestoneMenu, this);
+
+        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore, progressMenu, milestoneMenu);
         PluginCommand progress = getCommand("progress");
         if (progress != null) {
             progress.setExecutor(progressCommand);
@@ -55,6 +58,7 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
 
         getLogger().info("CdrMoonProgression v" + getPluginMeta().getVersion() + " enabled.");
         getLogger().info("Progress mode: GUI DEPOSIT ONLY (block break does not add points).");
+        getLogger().info("Milestone rewards: enabled (persistent one-time triggers).");
         getLogger().info("Overworld: " + dataStore.getTotal(ProgressStage.OVERWORLD) + "/" + progressionService.target(ProgressStage.OVERWORLD)
                 + " | Nether: " + dataStore.getTotal(ProgressStage.NETHER) + "/" + progressionService.target(ProgressStage.NETHER));
     }
