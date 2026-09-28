@@ -1,4 +1,4 @@
-# CdrMoonProgression v0.4.0
+# CdrMoonProgression v0.5.0
 # Paper 1.21.11 / Java 21
 #
 # Progression TIDAK bertambah saat block dihancurkan.
@@ -170,6 +170,16 @@ milestones:
       title: '&d&l100% COMPLETE'
       subtitle: '&fThe End expedition objective selesai.'
       commands: []
+
+# ============================================================
+# CONTRIBUTION HISTORY
+# ============================================================
+# history.yml menyimpan audit trail setoran yang BERHASIL.
+# max-entries membatasi file agar tidak tumbuh tanpa batas.
+history:
+  enabled: true
+  max-entries: 1000
+  timezone: 'Asia/Jakarta'
 
 # Jika list kosong, plugin memakai World.Environment sebagai fallback.
 # Isi nama world bila setup Multiverse/custom dimension ingin dibuat eksplisit.
