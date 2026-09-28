@@ -9,8 +9,10 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class ProgressionDataStore {
@@ -18,15 +20,20 @@ public final class ProgressionDataStore {
     private final File file;
     private final EnumMap<ProgressStage, Long> totals = new EnumMap<>(ProgressStage.class);
     private final Map<UUID, EnumMap<ProgressStage, Long>> contributions = new HashMap<>();
+    private final EnumMap<ProgressStage, Set<Integer>> claimedMilestones = new EnumMap<>(ProgressStage.class);
 
     private boolean netherUnlocked;
     private boolean endUnlocked;
+    private boolean milestonesInitialized;
     private boolean dirty;
 
     public ProgressionDataStore(CdrMoonProgressionPlugin plugin) {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "data.yml");
-        for (ProgressStage stage : ProgressStage.values()) totals.put(stage, 0L);
+        for (ProgressStage stage : ProgressStage.values()) {
+            totals.put(stage, 0L);
+            claimedMilestones.put(stage, new HashSet<>());
+        }
     }
 
     public void load() {
@@ -38,6 +45,7 @@ public final class ProgressionDataStore {
         }
         netherUnlocked = yaml.getBoolean("unlocked.nether", false);
         endUnlocked = yaml.getBoolean("unlocked.end", false);
+        milestonesInitialized = yaml.getBoolean("milestones.initialized", false);
 
         contributions.clear();
         ConfigurationSection root = yaml.getConfigurationSection("contributions");
@@ -54,6 +62,14 @@ public final class ProgressionDataStore {
                 } catch (IllegalArgumentException ex) {
                     plugin.getLogger().warning("Mengabaikan UUID invalid di data.yml: " + rawUuid);
                 }
+            }
+        }
+
+        for (ProgressStage stage : ProgressStage.values()) {
+            Set<Integer> values = claimedMilestones.computeIfAbsent(stage, ignored -> new HashSet<>());
+            values.clear();
+            for (int percent : yaml.getIntegerList("milestones.claimed." + stage.key())) {
+                if (percent > 0 && percent <= 100) values.add(percent);
             }
         }
         dirty = false;
@@ -75,6 +91,13 @@ public final class ProgressionDataStore {
         }
         yaml.set("unlocked.nether", netherUnlocked);
         yaml.set("unlocked.end", endUnlocked);
+        yaml.set("milestones.initialized", milestonesInitialized);
+
+        for (ProgressStage stage : ProgressStage.values()) {
+            List<Integer> claimed = new ArrayList<>(claimedMilestones.getOrDefault(stage, Set.of()));
+            claimed.sort(Integer::compareTo);
+            yaml.set("milestones.claimed." + stage.key(), claimed);
+        }
 
         for (Map.Entry<UUID, EnumMap<ProgressStage, Long>> entry : contributions.entrySet()) {
             for (ProgressStage stage : ProgressStage.values()) {
@@ -121,20 +144,46 @@ public final class ProgressionDataStore {
         dirty = true;
     }
 
+    public boolean isMilestoneClaimed(ProgressStage stage, int percent) {
+        return claimedMilestones.getOrDefault(stage, Set.of()).contains(percent);
+    }
+
+    public void markMilestoneClaimed(ProgressStage stage, int percent) {
+        if (percent <= 0 || percent > 100) return;
+        claimedMilestones.computeIfAbsent(stage, ignored -> new HashSet<>()).add(percent);
+        dirty = true;
+    }
+
+    public Set<Integer> claimedMilestones(ProgressStage stage) {
+        return Set.copyOf(claimedMilestones.getOrDefault(stage, Set.of()));
+    }
+
+    public boolean milestonesInitialized() {
+        return milestonesInitialized;
+    }
+
+    public void setMilestonesInitialized(boolean value) {
+        milestonesInitialized = value;
+        dirty = true;
+    }
+
     public void resetStage(ProgressStage stage) {
         totals.put(stage, 0L);
         for (EnumMap<ProgressStage, Long> values : contributions.values()) {
             values.remove(stage);
         }
         contributions.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+        claimedMilestones.computeIfAbsent(stage, ignored -> new HashSet<>()).clear();
         dirty = true;
     }
 
     public void resetAll() {
         for (ProgressStage stage : ProgressStage.values()) totals.put(stage, 0L);
         contributions.clear();
+        for (Set<Integer> values : claimedMilestones.values()) values.clear();
         netherUnlocked = false;
         endUnlocked = false;
+        milestonesInitialized = true;
         dirty = true;
     }
 
