@@ -10,33 +10,111 @@ Community dimension progression plugin untuk Moonsign. Target: Paper 1.21.11 / J
 4. Pilih resource yang tersedia di inventory.
 5. Pilih jumlah setoran: `1`, `16`, `64`, atau `Semua`.
 6. Item diambil dari inventory dan dikonversi menjadi progression point.
-7. Setoran berhasil dicatat ke `history.yml`.
-8. Saat progress melewati milestone global, reward milestone dijalankan otomatis satu kali.
-9. Overworld mencapai `50,000` -> The Nether terbuka.
-10. Nether mencapai `70,000` -> The End terbuka.
+7. Setoran berhasil dicatat ke `history.yml` dan personal contribution bertambah.
+8. Personal contribution dapat mencapai Personal Goals. Reward personal diberikan manual oleh admin.
+9. Saat progress global melewati milestone, reward milestone global dapat dijalankan otomatis satu kali.
+10. Overworld mencapai `50,000` -> The Nether terbuka.
+11. Nether mencapai `70,000` -> The End terbuka.
 
 Mulai v0.3.0, menghancurkan block tidak lagi langsung menambah progression.
 
-## Fitur v0.5.0
+## Fitur v0.6.0
 
 - Full inventory GUI progression melalui `/progress`.
 - Contribution Deposit GUI: setor `1 / 16 / 64 / semua`.
 - Global progression dan personal contribution.
 - Leaderboard contributor.
-- Milestone Rewards `10% / 25% / 50% / 75% / 100%` yang configurable.
-- Milestone reward command hanya dieksekusi satu kali dan persisten di `data.yml`.
-- Contribution History tersimpan terpisah di `history.yml`.
-- Setiap history menyimpan player, UUID, stage, resource, jumlah item, poin aktual, dan timestamp.
-- GUI history paginated, 45 log per halaman.
-- Filter history: `Semua / Overworld / Nether / Punyaku`.
-- History retention configurable supaya file tidak tumbuh tanpa batas.
-- Hanya setoran berhasil yang masuk history; command admin `add/set` tidak dipalsukan menjadi deposit player.
+- Milestone Rewards global configurable.
+- Contribution History persisten di `history.yml`.
+- Personal Contribution Goals per stage.
+- Default personal goal: `500 / 1,000 / 2,500 / 5,000 / 10,000` poin.
+- Personal goal status: `LOCKED / PENDING REWARD / REWARDED`.
+- Reward personal tidak pernah diberikan otomatis oleh plugin.
+- Admin dapat melihat antrean reward personal yang pending.
+- Admin menandai REWARDED setelah hadiah benar-benar diberikan manual.
+- Reward state personal goal persisten di `data.yml`.
+- Reset stage ikut mereset personal contribution dan personal reward state stage tersebut.
 - Hanya stage aktif yang menerima setoran.
 - Deposit otomatis dibatasi ketika target hampir selesai.
 - Named/custom-model/PDC items tidak dianggap resource deposit vanilla.
 - Auto unlock Nether dan End.
 - Dimension lock untuk portal dan teleport.
 - Optional PlaceholderAPI hook.
+
+## Personal Contribution Goals
+
+Player membuka GUI:
+
+```text
+/progress goals
+/progress goals overworld
+/progress goals nether
+```
+
+Status goal:
+
+```text
+LOCKED
+  Belum mencapai target personal.
+
+PENDING REWARD
+  Target sudah tercapai, reward belum dikonfirmasi admin.
+
+REWARDED
+  Admin sudah memberikan reward manual dan menandai selesai.
+```
+
+Default config:
+
+```yaml
+personal-goals:
+  enabled: true
+  overworld:
+    '500':
+      name: '&aContributor I'
+      icon: IRON_NUGGET
+      lore:
+        - '&7Kontribusi awal expedition.'
+    '1000':
+      name: '&eContributor II'
+      icon: IRON_INGOT
+  nether:
+    '500':
+      name: '&aNether Contributor I'
+      icon: NETHER_BRICK
+```
+
+Tidak ada field `commands` pada personal goals karena reward sengaja dikelola manual oleh admin.
+
+### Admin reward flow
+
+Lihat semua reward yang belum diberikan:
+
+```text
+/progressadmin goals pending all
+/progressadmin goals pending overworld
+/progressadmin goals pending nether
+```
+
+Setelah admin memberikan hadiah manual:
+
+```text
+/progressadmin goals reward <player> <overworld|nether> <goal>
+```
+
+Contoh:
+
+```text
+/progressadmin goals reward Cadera overworld 2500
+```
+
+Jika salah menandai atau reward perlu dibuka kembali:
+
+```text
+/progressadmin goals unreward Cadera overworld 2500
+```
+
+Plugin tidak memberi item, money, key, permission, atau reward lain ketika personal goal tercapai. Plugin hanya melacak eligibility dan status administrasinya.
 
 ## Contribution History
 
@@ -69,74 +147,36 @@ history:
   timezone: 'Asia/Jakarta'
 ```
 
-Entry terbaru disimpan paling atas. Ketika jumlah log melebihi `max-entries`, log paling lama dibuang otomatis.
-
 ## Milestone Rewards
 
-Konfigurasi milestone berada di:
+Milestone global tetap merupakan sistem terpisah dari personal goal. Command milestone dapat dijalankan otomatis sebagai console dan hanya satu kali.
 
-```yaml
-milestones:
-  reward-existing-progress-on-first-load: false
-  overworld:
-    '25':
-      name: '&eSupply II'
-      icon: IRON_INGOT
-      lore:
-        - '&7Seperempat expedition selesai.'
-      broadcast: '&eMilestone Overworld 25% tercapai!'
-      title: ''
-      subtitle: ''
-      commands:
-        - 'give @a minecraft:diamond 1'
-```
-
-Command milestone dijalankan sebagai console. Placeholder tersedia: `{stage}`, `{stage_key}`, `{percent}`, `{current}`, `{target}`.
-
-## Default deposit resources
-
-### Overworld
-
-- Coal
-- Raw Copper
-- Raw Iron
-- Raw Gold
-- Redstone
-- Lapis Lazuli
-- Emerald
-- Diamond
-- Overworld logs
-
-### Nether
-
-- Netherrack
-- Soul Sand
-- Soul Soil
-- Quartz
-- Gold Nugget
-- Blackstone
-- Basalt
-- Bone Block
-- Glowstone Dust
-- Ancient Debris
-
-Semua nilai poin dapat diubah pada `progression.<stage>.deposit-items` di `config.yml`.
+Placeholder milestone tersedia: `{stage}`, `{stage_key}`, `{percent}`, `{current}`, `{target}`.
 
 ## Commands
+
+Player:
 
 - `/progress`
 - `/progress overworld`
 - `/progress nether`
 - `/progress top [overworld|nether]`
 - `/progress me`
+- `/progress goals [overworld|nether]`
 - `/progress milestones [overworld|nether]`
 - `/progress history [all|overworld|nether|me]`
+
+Admin:
+
 - `/progressadmin status`
 - `/progressadmin add <overworld|nether> <amount> [player]`
 - `/progressadmin set <overworld|nether> <amount>`
 - `/progressadmin reset <overworld|nether|all>`
 - `/progressadmin unlock <nether|end>`
 - `/progressadmin lock <nether|end>`
+- `/progressadmin goals pending [overworld|nether|all]`
+- `/progressadmin goals reward <player> <stage> <goal>`
+- `/progressadmin goals unreward <player> <stage> <goal>`
 - `/progressadmin reload`
 - `/progressadmin save`
 
@@ -173,5 +213,5 @@ mvn clean package
 Output:
 
 ```text
-target/CdrMoonProgression-0.5.0-SNAPSHOT.jar
+target/CdrMoonProgression-0.6.0-SNAPSHOT.jar
 ```
