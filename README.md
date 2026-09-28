@@ -1,54 +1,74 @@
 # CdrMoonProgression
 
-Community dimension progression plugin untuk Moonsign. Target awal: Paper 1.21.11 / Java 21.
+Community dimension progression plugin untuk Moonsign. Target: Paper 1.21.11 / Java 21.
 
 ## Gameplay flow
 
-1. Player mengumpulkan progression dari block natural di Overworld.
-2. `/progress` membuka GUI utama progression.
-3. Saat global Overworld mencapai `50,000`, The Nether otomatis terbuka.
-4. Progress berikutnya hanya dihitung dari resource Nether.
-5. Saat global Nether mencapai `70,000`, The End otomatis terbuka.
+1. Player mengumpulkan resource secara normal.
+2. Player membuka `/progress`.
+3. Pilih stage aktif lalu **Setor Kontribusi**.
+4. Pilih resource yang tersedia di inventory.
+5. Pilih jumlah setoran: `1`, `16`, `64`, atau `Semua`.
+6. Item diambil dari inventory dan dikonversi menjadi progression point.
+7. Overworld mencapai `50,000` -> The Nether terbuka.
+8. Nether mencapai `70,000` -> The End terbuka.
 
-Target dan nilai setiap block dapat diubah dari `config.yml`.
+Mulai v0.3.0, menghancurkan block tidak lagi langsung menambah progression.
 
-## Fitur v0.2.0
+## Fitur v0.3.0
 
-- Full inventory GUI untuk `/progress`.
-- Main progression dashboard.
-- Detail stage Overworld dan Nether.
-- Visual progress bar di inventory.
-- Personal contribution panel.
-- Top contributor leaderboard GUI.
-- Resource contribution browser + point value.
-- GUI pagination untuk resource list.
+- Full inventory GUI melalui `/progress`.
+- Contribution Deposit GUI.
+- Resource selector per stage.
+- Setor 1 / 16 / 64 / semua.
 - Global progression per stage.
 - Personal contribution per player.
-- Configurable block point values.
+- Leaderboard contributor.
+- Deposit value configurable dari `config.yml`.
+- Hanya stage aktif yang dapat menerima setoran.
+- Deposit otomatis dibatasi agar tidak mengambil item berlebihan saat target hampir selesai.
+- Named/custom-model/PDC items tidak dianggap resource deposit vanilla.
 - Auto unlock Nether dan End.
 - Dimension lock untuk portal dan teleport.
-- Anti exploit player-placed block yang persisten setelah restart.
-- Tracking perpindahan placed block oleh piston.
-- Cleanup marker saat block terbakar/meledak.
-- Admin control `/progressadmin`.
 - Optional PlaceholderAPI hook.
-- Auto-save progress + compact binary placement database.
+- Data progression tetap persisten pada `data.yml`.
 
-Tidak ada BossBar progression. HUD player tetap bersih; status progression dibuka saat diperlukan melalui GUI.
+## Default deposit resources
 
-## Player command
+### Overworld
 
-- `/progress` — membuka menu utama.
+- Coal
+- Raw Copper
+- Raw Iron
+- Raw Gold
+- Redstone
+- Lapis Lazuli
+- Emerald
+- Diamond
+- Overworld logs
 
-Shortcut berikut tetap tersedia untuk staff/testing atau akses cepat:
+### Nether
 
+- Netherrack
+- Soul Sand
+- Soul Soil
+- Quartz
+- Gold Nugget
+- Blackstone
+- Basalt
+- Bone Block
+- Glowstone Dust
+- Ancient Debris
+
+Semua nilai poin dapat diubah pada `progression.<stage>.deposit-items` di `config.yml`.
+
+## Commands
+
+- `/progress`
 - `/progress overworld`
 - `/progress nether`
 - `/progress top [overworld|nether]`
 - `/progress me`
-
-## Admin commands
-
 - `/progressadmin status`
 - `/progressadmin add <overworld|nether> <amount> [player]`
 - `/progressadmin set <overworld|nether> <amount>`
@@ -91,5 +111,5 @@ mvn clean package
 Output:
 
 ```text
-target/CdrMoonProgression-0.2.0-SNAPSHOT.jar
+target/CdrMoonProgression-0.3.0-SNAPSHOT.jar
 ```
