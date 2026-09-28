@@ -105,6 +105,10 @@ public final class ProgressionService {
         return blockValues.getOrDefault(stage, Map.of()).getOrDefault(material, 0);
     }
 
+    public Map<Material, Integer> blockValues(ProgressStage stage) {
+        return Map.copyOf(blockValues.getOrDefault(stage, Map.of()));
+    }
+
     public long target(ProgressStage stage) {
         return targets.getOrDefault(stage, 1L);
     }

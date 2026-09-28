@@ -24,7 +24,10 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ProgressionListener(progressionService, placedBlockStore), this);
         getServer().getPluginManager().registerEvents(new DimensionLockListener(this, progressionService, dataStore), this);
 
-        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore);
+        ProgressMenu progressMenu = new ProgressMenu(this, progressionService, dataStore);
+        getServer().getPluginManager().registerEvents(progressMenu, this);
+
+        ProgressCommand progressCommand = new ProgressCommand(this, progressionService, dataStore, progressMenu);
         PluginCommand progress = getCommand("progress");
         if (progress != null) {
             progress.setExecutor(progressCommand);
