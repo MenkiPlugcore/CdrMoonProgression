@@ -16,12 +16,15 @@ public final class ProgressCommand implements TabExecutor {
     private final ProgressionService service;
     private final ProgressionDataStore data;
     private final ProgressMenu menu;
+    private final MilestoneMenu milestoneMenu;
 
-    public ProgressCommand(CdrMoonProgressionPlugin plugin, ProgressionService service, ProgressionDataStore data, ProgressMenu menu) {
+    public ProgressCommand(CdrMoonProgressionPlugin plugin, ProgressionService service, ProgressionDataStore data,
+                           ProgressMenu menu, MilestoneMenu milestoneMenu) {
         this.plugin = plugin;
         this.service = service;
         this.data = data;
         this.menu = menu;
+        this.milestoneMenu = milestoneMenu;
     }
 
     @Override
@@ -33,6 +36,18 @@ public final class ProgressCommand implements TabExecutor {
 
         if (args.length == 0) {
             menu.openMain(player);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("milestones") || args[0].equalsIgnoreCase("milestone")) {
+            ProgressStage stage = args.length > 1
+                    ? ProgressStage.parse(args[1]).orElse(null)
+                    : service.activeStage().orElse(ProgressStage.OVERWORLD);
+            if (stage == null) {
+                menu.openMain(player);
+            } else {
+                milestoneMenu.open(player, stage);
+            }
             return true;
         }
 
@@ -69,8 +84,11 @@ public final class ProgressCommand implements TabExecutor {
         for (ProgressStage stage : ProgressStage.values()) {
             long current = data.getTotal(stage);
             long target = service.target(stage);
+            String next = service.nextMilestone(stage)
+                    .map(m -> m.percent() + "%")
+                    .orElse("selesai");
             sender.sendMessage(plugin.color("&f" + stage.displayName() + ": &b" + format(current) + "&7/&f" + format(target)
-                    + " &7(" + String.format(Locale.US, "%.1f%%", service.percent(stage)) + ")"));
+                    + " &7(" + String.format(Locale.US, "%.1f%%", service.percent(stage)) + ") &8• &7next milestone: &f" + next));
         }
         sender.sendMessage(plugin.color("&7Nether: " + (data.isNetherUnlocked() ? "&aUNLOCKED" : "&cLOCKED")));
         sender.sendMessage(plugin.color("&7End: " + (data.isEndUnlocked() ? "&aUNLOCKED" : "&cLOCKED")));
@@ -83,8 +101,10 @@ public final class ProgressCommand implements TabExecutor {
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
-        if (args.length == 1) return filter(List.of("overworld", "nether", "top", "me"), args[0]);
-        if (args.length == 2 && args[0].equalsIgnoreCase("top")) return filter(List.of("overworld", "nether"), args[1]);
+        if (args.length == 1) return filter(List.of("overworld", "nether", "top", "me", "milestones"), args[0]);
+        if (args.length == 2 && (args[0].equalsIgnoreCase("top") || args[0].equalsIgnoreCase("milestones") || args[0].equalsIgnoreCase("milestone"))) {
+            return filter(List.of("overworld", "nether"), args[1]);
+        }
         return List.of();
     }
 
