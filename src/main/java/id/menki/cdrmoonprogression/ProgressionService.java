@@ -25,11 +25,13 @@ public final class ProgressionService {
     private final EnumMap<ProgressStage, Long> targets = new EnumMap<>(ProgressStage.class);
     private final EnumMap<ProgressStage, Map<Material, Integer>> depositValues = new EnumMap<>(ProgressStage.class);
     private final EnumMap<ProgressStage, List<Milestone>> milestones = new EnumMap<>(ProgressStage.class);
+    private final EnumMap<ProgressStage, List<ResourceRequirement>> resourceRequirements = new EnumMap<>(ProgressStage.class);
 
     private List<String> overworldWorlds = List.of();
     private List<String> netherWorlds = List.of();
     private List<String> endWorlds = List.of();
     private boolean dimensionLockEnabled;
+    private boolean resourceRequirementsEnabled;
 
     public ProgressionService(CdrMoonProgressionPlugin plugin, ProgressionDataStore data, ContributionHistoryStore history) {
         this.plugin = plugin;
@@ -42,6 +44,8 @@ public final class ProgressionService {
         targets.clear();
         depositValues.clear();
         milestones.clear();
+        resourceRequirements.clear();
+        resourceRequirementsEnabled = plugin.getConfig().getBoolean("resource-requirements.enabled", true);
 
         for (ProgressStage stage : ProgressStage.values()) {
             long defaultTarget = stage == ProgressStage.OVERWORLD ? 50_000L : 70_000L;
@@ -63,6 +67,7 @@ public final class ProgressionService {
             }
             depositValues.put(stage, values);
             milestones.put(stage, loadMilestones(stage));
+            resourceRequirements.put(stage, loadResourceRequirements(stage));
         }
 
         overworldWorlds = normalizeWorldList(plugin.getConfig().getStringList("worlds.overworld"));
@@ -71,6 +76,7 @@ public final class ProgressionService {
         dimensionLockEnabled = plugin.getConfig().getBoolean("dimension-lock.enabled", true);
         history.reloadSettings();
 
+        initializeRequirementState();
         initializeMilestoneState();
     }
 
@@ -108,6 +114,62 @@ public final class ProgressionService {
         return List.copyOf(result);
     }
 
+    private List<ResourceRequirement> loadResourceRequirements(ProgressStage stage) {
+        if (!resourceRequirementsEnabled) return List.of();
+        List<ResourceRequirement> result = new ArrayList<>();
+        ConfigurationSection root = plugin.getConfig().getConfigurationSection("resource-requirements." + stage.key());
+        if (root == null) return List.of();
+
+        for (String rawId : root.getKeys(false)) {
+            String id = rawId.toLowerCase(Locale.ROOT);
+            String path = "resource-requirements." + stage.key() + "." + rawId;
+            long target = plugin.getConfig().getLong(path + ".target", 0L);
+            if (target <= 0L) {
+                plugin.getLogger().warning("Resource requirement target invalid: " + stage.key() + "." + rawId);
+                continue;
+            }
+
+            List<Material> materials = new ArrayList<>();
+            for (String rawMaterial : plugin.getConfig().getStringList(path + ".materials")) {
+                Material material = Material.matchMaterial(rawMaterial.toUpperCase(Locale.ROOT));
+                if (material == null || material.isAir()) {
+                    plugin.getLogger().warning("Material requirement tidak dikenal: " + rawMaterial + " pada " + stage.key() + "." + rawId);
+                    continue;
+                }
+                materials.add(material);
+                if (!depositValues.getOrDefault(stage, Map.of()).containsKey(material)) {
+                    plugin.getLogger().warning("Material requirement " + material + " tidak ada di deposit-items stage " + stage.key() + ".");
+                }
+            }
+            if (materials.isEmpty()) {
+                plugin.getLogger().warning("Resource requirement tanpa material valid: " + stage.key() + "." + rawId);
+                continue;
+            }
+
+            String name = plugin.getConfig().getString(path + ".name", prettyId(rawId));
+            Material icon = Material.matchMaterial(plugin.getConfig().getString(path + ".icon", materials.getFirst().name()));
+            if (icon == null || icon.isAir()) icon = materials.getFirst();
+            result.add(new ResourceRequirement(id, name, icon, target, List.copyOf(materials)));
+        }
+
+        result.sort(Comparator.comparing(ResourceRequirement::id));
+        return List.copyOf(result);
+    }
+
+    private void initializeRequirementState() {
+        if (!resourceRequirementsEnabled || data.requirementsInitialized()) return;
+
+        boolean importHistory = plugin.getConfig().getBoolean("resource-requirements.initialize-from-history", true);
+        if (importHistory) {
+            for (ContributionHistoryStore.Entry entry : history.all()) {
+                creditRequirementItems(entry.stage(), entry.material(), entry.items());
+            }
+            plugin.getLogger().info("Resource requirements initialized dari contribution history: " + history.size() + " history entries scanned.");
+        }
+        data.setRequirementsInitialized(true);
+        data.save();
+    }
+
     private void initializeMilestoneState() {
         if (data.milestonesInitialized()) return;
 
@@ -118,9 +180,9 @@ public final class ProgressionService {
             } else {
                 double currentPercent = percent(stage);
                 for (Milestone milestone : milestones(stage)) {
-                    if (currentPercent + 0.0001D >= milestone.percent()) {
-                        data.markMilestoneClaimed(stage, milestone.percent());
-                    }
+                    if (currentPercent + 0.0001D < milestone.percent()) continue;
+                    if (milestone.percent() == 100 && !requirementsSatisfied(stage)) continue;
+                    data.markMilestoneClaimed(stage, milestone.percent());
                 }
             }
         }
@@ -171,6 +233,23 @@ public final class ProgressionService {
         return total;
     }
 
+    public long usefulDepositItems(ProgressStage stage, Material material, long available) {
+        if (available <= 0L) return 0L;
+        int pointValue = depositValue(stage, material);
+        if (pointValue <= 0) return 0L;
+
+        long remainingPoints = Math.max(0L, target(stage) - data.getTotal(stage));
+        long usefulForPoints = remainingPoints <= 0L ? 0L : (remainingPoints + pointValue - 1L) / pointValue;
+
+        long usefulForRequirements = 0L;
+        for (ResourceRequirement requirement : matchingRequirements(stage, material)) {
+            long remaining = Math.max(0L, requirement.target() - requirementProgress(stage, requirement));
+            usefulForRequirements = Math.max(usefulForRequirements, remaining);
+        }
+
+        return Math.min(available, Math.max(usefulForPoints, usefulForRequirements));
+    }
+
     public DepositResult deposit(Player player, ProgressStage stage, Material material, int requestedAmount) {
         if (player == null || stage == null || material == null) return DepositResult.failed("invalid");
         if (!isStageActive(stage)) return DepositResult.failed("inactive-stage");
@@ -184,24 +263,25 @@ public final class ProgressionService {
         int wanted = requestedAmount <= 0 || requestedAmount == Integer.MAX_VALUE
                 ? available
                 : Math.min(requestedAmount, available);
+        long useful = usefulDepositItems(stage, material, wanted);
+        if (useful <= 0L) return DepositResult.failed("not-needed");
 
-        long remainingPoints = Math.max(0L, target(stage) - data.getTotal(stage));
-        if (remainingPoints <= 0L) return DepositResult.failed("completed");
-
-        long usefulItemsLong = (remainingPoints + pointValue - 1L) / pointValue;
-        int usefulItems = (int) Math.min(Integer.MAX_VALUE, usefulItemsLong);
-        int toConsume = Math.min(wanted, usefulItems);
-        if (toConsume <= 0) return DepositResult.failed("completed");
-
+        int toConsume = (int) Math.min(Integer.MAX_VALUE, useful);
         int removed = removeDepositable(player.getInventory(), material, toConsume);
         if (removed <= 0) return DepositResult.failed("no-items");
 
-        long requestedPoints = (long) removed * pointValue;
-        long actualPoints = addProgress(stage, requestedPoints, player.getUniqueId());
-        if (actualPoints > 0) {
-            history.add(player.getUniqueId(), player.getName(), stage, material, removed, actualPoints);
-        }
-        return new DepositResult(true, removed, actualPoints, pointValue, countDepositable(player, material), null);
+        long creditedPoints = (long) removed * pointValue;
+        long current = data.getTotal(stage);
+        long globalAdded = Math.min(Math.max(0L, target(stage) - current), creditedPoints);
+        if (globalAdded > 0L) data.setTotal(stage, current + globalAdded);
+
+        data.addContribution(player.getUniqueId(), stage, creditedPoints);
+        creditRequirementItems(stage, material, removed);
+        processMilestones(stage);
+        checkUnlock(stage);
+
+        history.add(player.getUniqueId(), player.getName(), stage, material, removed, creditedPoints);
+        return new DepositResult(true, removed, creditedPoints, pointValue, countDepositable(player, material), null);
     }
 
     private int removeDepositable(PlayerInventory inventory, Material material, int amount) {
@@ -250,6 +330,97 @@ public final class ProgressionService {
         return activeStage().map(active -> active == stage).orElse(false);
     }
 
+    public boolean stageComplete(ProgressStage stage) {
+        return data.getTotal(stage) >= target(stage) && requirementsSatisfied(stage);
+    }
+
+    public boolean requirementsEnabled() {
+        return resourceRequirementsEnabled;
+    }
+
+    public List<ResourceRequirement> requirements(ProgressStage stage) {
+        return resourceRequirements.getOrDefault(stage, List.of());
+    }
+
+    public Optional<ResourceRequirement> requirement(ProgressStage stage, String id) {
+        if (id == null) return Optional.empty();
+        for (ResourceRequirement requirement : requirements(stage)) {
+            if (requirement.id().equalsIgnoreCase(id)) return Optional.of(requirement);
+        }
+        return Optional.empty();
+    }
+
+    public List<ResourceRequirement> matchingRequirements(ProgressStage stage, Material material) {
+        if (!resourceRequirementsEnabled || material == null) return List.of();
+        List<ResourceRequirement> result = new ArrayList<>();
+        for (ResourceRequirement requirement : requirements(stage)) {
+            if (requirement.materials().contains(material)) result.add(requirement);
+        }
+        return List.copyOf(result);
+    }
+
+    public long requirementProgress(ProgressStage stage, ResourceRequirement requirement) {
+        return Math.min(requirement.target(), data.getRequirementProgress(stage, requirement.id()));
+    }
+
+    public double requirementPercent(ProgressStage stage, ResourceRequirement requirement) {
+        return Math.min(100.0D, requirementProgress(stage, requirement) * 100.0D / requirement.target());
+    }
+
+    public int completedRequirementCount(ProgressStage stage) {
+        int complete = 0;
+        for (ResourceRequirement requirement : requirements(stage)) {
+            if (requirementProgress(stage, requirement) >= requirement.target()) complete++;
+        }
+        return complete;
+    }
+
+    public int totalRequirementCount(ProgressStage stage) {
+        return requirements(stage).size();
+    }
+
+    public boolean requirementsSatisfied(ProgressStage stage) {
+        if (!resourceRequirementsEnabled) return true;
+        for (ResourceRequirement requirement : requirements(stage)) {
+            if (requirementProgress(stage, requirement) < requirement.target()) return false;
+        }
+        return true;
+    }
+
+    private void creditRequirementItems(ProgressStage stage, Material material, long items) {
+        if (!resourceRequirementsEnabled || items <= 0L) return;
+        for (ResourceRequirement requirement : matchingRequirements(stage, material)) {
+            long current = requirementProgress(stage, requirement);
+            if (current >= requirement.target()) continue;
+            data.setRequirementProgress(stage, requirement.id(), Math.min(requirement.target(), current + items));
+        }
+    }
+
+    public boolean setRequirementProgress(ProgressStage stage, String id, long value) {
+        Optional<ResourceRequirement> configured = requirement(stage, id);
+        if (configured.isEmpty()) return false;
+        ResourceRequirement requirement = configured.get();
+        data.setRequirementProgress(stage, requirement.id(), Math.min(requirement.target(), Math.max(0L, value)));
+        processMilestones(stage);
+        checkUnlock(stage);
+        return true;
+    }
+
+    public boolean addRequirementProgress(ProgressStage stage, String id, long amount) {
+        Optional<ResourceRequirement> configured = requirement(stage, id);
+        if (configured.isEmpty()) return false;
+        ResourceRequirement requirement = configured.get();
+        long next = Math.min(requirement.target(), Math.max(0L, requirementProgress(stage, requirement) + amount));
+        data.setRequirementProgress(stage, requirement.id(), next);
+        processMilestones(stage);
+        checkUnlock(stage);
+        return true;
+    }
+
+    public void resetRequirementProgress(ProgressStage stage) {
+        data.clearRequirementProgress(stage);
+    }
+
     public List<Milestone> milestones(ProgressStage stage) {
         return milestones.getOrDefault(stage, List.of());
     }
@@ -286,6 +457,7 @@ public final class ProgressionService {
         double currentPercent = percent(stage);
         for (Milestone milestone : milestones(stage)) {
             if (currentPercent + 0.0001D < milestone.percent()) continue;
+            if (milestone.percent() == 100 && !requirementsSatisfied(stage)) continue;
             if (data.isMilestoneClaimed(stage, milestone.percent())) continue;
 
             data.markMilestoneClaimed(stage, milestone.percent());
@@ -327,7 +499,7 @@ public final class ProgressionService {
     }
 
     private void checkUnlock(ProgressStage stage) {
-        if (data.getTotal(stage) < target(stage)) return;
+        if (!stageComplete(stage)) return;
 
         if (stage == ProgressStage.OVERWORLD && !data.isNetherUnlocked()) {
             data.setNetherUnlocked(true);
@@ -385,6 +557,18 @@ public final class ProgressionService {
     public boolean dimensionLockEnabled() {
         return dimensionLockEnabled;
     }
+
+    private String prettyId(String id) {
+        String[] words = id.replace('-', '_').toLowerCase(Locale.ROOT).split("_");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (!result.isEmpty()) result.append(' ');
+            if (!word.isEmpty()) result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return result.toString();
+    }
+
+    public record ResourceRequirement(String id, String name, Material icon, long target, List<Material> materials) {}
 
     public record Milestone(int percent, String name, Material icon, List<String> lore, List<String> commands,
                             String broadcast, String title, String subtitle) {}
