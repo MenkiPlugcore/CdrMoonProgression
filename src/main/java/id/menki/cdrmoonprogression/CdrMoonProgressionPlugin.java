@@ -73,11 +73,14 @@ public final class CdrMoonProgressionPlugin extends JavaPlugin {
 
         getLogger().info("CdrMoonProgression v" + getPluginMeta().getVersion() + " enabled.");
         getLogger().info("Progress mode: GUI DEPOSIT ONLY (block break does not add points).");
+        getLogger().info("Resource requirements: " + (progressionService.requirementsEnabled() ? "enabled" : "disabled") + ".");
         getLogger().info("Milestone rewards: enabled (persistent one-time triggers).");
         getLogger().info("Contribution history: " + historyStore.size() + " entries loaded.");
         getLogger().info("Personal goals: " + (personalGoalService.enabled() ? "enabled, manual rewards" : "disabled") + ".");
         getLogger().info("Overworld: " + dataStore.getTotal(ProgressStage.OVERWORLD) + "/" + progressionService.target(ProgressStage.OVERWORLD)
-                + " | Nether: " + dataStore.getTotal(ProgressStage.NETHER) + "/" + progressionService.target(ProgressStage.NETHER));
+                + " | requirements " + progressionService.completedRequirementCount(ProgressStage.OVERWORLD) + "/" + progressionService.totalRequirementCount(ProgressStage.OVERWORLD));
+        getLogger().info("Nether: " + dataStore.getTotal(ProgressStage.NETHER) + "/" + progressionService.target(ProgressStage.NETHER)
+                + " | requirements " + progressionService.completedRequirementCount(ProgressStage.NETHER) + "/" + progressionService.totalRequirementCount(ProgressStage.NETHER));
     }
 
     @Override
