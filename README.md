@@ -10,12 +10,13 @@ Community dimension progression plugin untuk Moonsign. Target: Paper 1.21.11 / J
 4. Pilih resource yang tersedia di inventory.
 5. Pilih jumlah setoran: `1`, `16`, `64`, atau `Semua`.
 6. Item diambil dari inventory dan dikonversi menjadi progression point.
-7. Overworld mencapai `50,000` -> The Nether terbuka.
-8. Nether mencapai `70,000` -> The End terbuka.
+7. Saat progress melewati milestone global, reward milestone dijalankan otomatis satu kali.
+8. Overworld mencapai `50,000` -> The Nether terbuka.
+9. Nether mencapai `70,000` -> The End terbuka.
 
 Mulai v0.3.0, menghancurkan block tidak lagi langsung menambah progression.
 
-## Fitur v0.3.0
+## Fitur v0.4.0
 
 - Full inventory GUI melalui `/progress`.
 - Contribution Deposit GUI.
@@ -25,6 +26,15 @@ Mulai v0.3.0, menghancurkan block tidak lagi langsung menambah progression.
 - Personal contribution per player.
 - Leaderboard contributor.
 - Deposit value configurable dari `config.yml`.
+- Milestone Rewards configurable per stage.
+- Default milestone `10% / 25% / 50% / 75% / 100%`.
+- Reward milestone menjalankan console commands tepat satu kali.
+- Broadcast/title/subtitle milestone configurable.
+- Milestone state persisten di `data.yml`, sehingga restart tidak menggandakan reward.
+- GUI status milestone: `PENDING / REACHED / REWARDED`.
+- `/progress milestones [overworld|nether]` untuk membuka Milestone GUI.
+- Reset stage juga mereset milestone claim untuk stage tersebut.
+- Migration aman dari v0.3: milestone yang sudah terlewati tidak otomatis membagikan reward lama secara default.
 - Hanya stage aktif yang dapat menerima setoran.
 - Deposit otomatis dibatasi agar tidak mengambil item berlebihan saat target hampir selesai.
 - Named/custom-model/PDC items tidak dianggap resource deposit vanilla.
@@ -32,6 +42,36 @@ Mulai v0.3.0, menghancurkan block tidak lagi langsung menambah progression.
 - Dimension lock untuk portal dan teleport.
 - Optional PlaceholderAPI hook.
 - Data progression tetap persisten pada `data.yml`.
+
+## Milestone Rewards
+
+Konfigurasi milestone berada di:
+
+```yaml
+milestones:
+  reward-existing-progress-on-first-load: false
+  overworld:
+    '25':
+      name: '&eSupply II'
+      icon: IRON_INGOT
+      lore:
+        - '&7Seperempat expedition selesai.'
+      broadcast: '&eMilestone Overworld 25% tercapai!'
+      title: ''
+      subtitle: ''
+      commands:
+        - 'give @a minecraft:diamond 1'
+```
+
+Command dijalankan sebagai console. Placeholder yang dapat digunakan:
+
+- `{stage}`
+- `{stage_key}`
+- `{percent}`
+- `{current}`
+- `{target}`
+
+`reward-existing-progress-on-first-load: false` direkomendasikan saat upgrade server live. Progress lama yang sudah melewati milestone akan ditandai sebagai rewarded tanpa menjalankan reward secara mendadak.
 
 ## Default deposit resources
 
@@ -69,6 +109,7 @@ Semua nilai poin dapat diubah pada `progression.<stage>.deposit-items` di `confi
 - `/progress nether`
 - `/progress top [overworld|nether]`
 - `/progress me`
+- `/progress milestones [overworld|nether]`
 - `/progressadmin status`
 - `/progressadmin add <overworld|nether> <amount> [player]`
 - `/progressadmin set <overworld|nether> <amount>`
@@ -111,5 +152,5 @@ mvn clean package
 Output:
 
 ```text
-target/CdrMoonProgression-0.3.0-SNAPSHOT.jar
+target/CdrMoonProgression-0.4.0-SNAPSHOT.jar
 ```

@@ -1,7 +1,7 @@
-# CdrMoonProgression v0.3.0
+# CdrMoonProgression v0.4.0
 # Paper 1.21.11 / Java 21
 #
-# Progression TIDAK lagi bertambah saat block dihancurkan.
+# Progression TIDAK bertambah saat block dihancurkan.
 # Player mengumpulkan resource lalu menyetorkannya melalui /progress.
 
 progression:
@@ -40,6 +40,136 @@ progression:
       GLOWSTONE_DUST: 1
       ANCIENT_DEBRIS: 25
     unlock-commands: []
+
+# ============================================================
+# MILESTONE REWARDS
+# ============================================================
+# Reward command dijalankan sebagai CONSOLE tepat satu kali per milestone.
+# Placeholder tersedia di broadcast/title/subtitle/commands:
+# {stage} {stage_key} {percent} {current} {target}
+#
+# Contoh integrasi (hapus # bila ingin dipakai):
+#   commands:
+#     - "eco give * 500"
+#     - "crate key giveall expedition 1"
+#     - "give @a minecraft:diamond 1"
+#
+# false = saat upgrade dari v0.3, milestone yang sudah terlewati ditandai
+# sebagai REWARDED tanpa mengeksekusi reward lama secara tiba-tiba.
+milestones:
+  reward-existing-progress-on-first-load: false
+
+  overworld:
+    '10':
+      name: '&a&lSupply I &8• &f10%'
+      icon: CHEST
+      lore:
+        - '&7Expedition mulai mendapatkan'
+        - '&7pasokan yang stabil.'
+      broadcast: '&a&lMILESTONE! &fOverworld Expedition mencapai &a10%&f.'
+      title: ''
+      subtitle: ''
+      commands: []
+
+    '25':
+      name: '&e&lSupply II &8• &f25%'
+      icon: IRON_INGOT
+      lore:
+        - '&7Seperempat kebutuhan expedition'
+        - '&7sudah terkumpul.'
+      broadcast: '&e&lMILESTONE! &fOverworld Expedition mencapai &e25%&f.'
+      title: ''
+      subtitle: ''
+      commands: []
+
+    '50':
+      name: '&6&lHalfway &8• &f50%'
+      icon: GOLD_INGOT
+      lore:
+        - '&7Setengah perjalanan menuju'
+        - '&7The Nether telah selesai.'
+      broadcast: '&6&lHALFWAY! &fOverworld Expedition mencapai &650%&f.'
+      title: '&6&lEXPEDITION HALFWAY'
+      subtitle: '&fOverworld Progress &6{percent}%'
+      commands: []
+
+    '75':
+      name: '&b&lFinal Push &8• &f75%'
+      icon: DIAMOND
+      lore:
+        - '&7Tinggal seperempat lagi menuju'
+        - '&7pembukaan The Nether.'
+      broadcast: '&b&lFINAL PUSH! &fOverworld Expedition mencapai &b75%&f.'
+      title: ''
+      subtitle: ''
+      commands: []
+
+    '100':
+      name: '&d&lExpedition Complete &8• &f100%'
+      icon: OBSIDIAN
+      lore:
+        - '&7Target Overworld selesai.'
+        - '&7The Nether siap dibuka.'
+      broadcast: '&d&lMILESTONE COMPLETE! &fOverworld Expedition mencapai &d100%&f.'
+      title: '&d&l100% COMPLETE'
+      subtitle: '&fThe Nether expedition objective selesai.'
+      commands: []
+
+  nether:
+    '10':
+      name: '&a&lNether Supply I &8• &f10%'
+      icon: NETHERRACK
+      lore:
+        - '&7Supply Nether pertama'
+        - '&7berhasil dikumpulkan.'
+      broadcast: '&a&lMILESTONE! &fNether Expedition mencapai &a10%&f.'
+      title: ''
+      subtitle: ''
+      commands: []
+
+    '25':
+      name: '&e&lNether Supply II &8• &f25%'
+      icon: QUARTZ
+      lore:
+        - '&7Seperempat kebutuhan menuju'
+        - '&7The End sudah terkumpul.'
+      broadcast: '&e&lMILESTONE! &fNether Expedition mencapai &e25%&f.'
+      title: ''
+      subtitle: ''
+      commands: []
+
+    '50':
+      name: '&6&lNether Halfway &8• &f50%'
+      icon: GOLD_BLOCK
+      lore:
+        - '&7Perjalanan menuju The End'
+        - '&7telah mencapai setengah jalan.'
+      broadcast: '&6&lHALFWAY! &fNether Expedition mencapai &650%&f.'
+      title: '&6&lNETHER HALFWAY'
+      subtitle: '&fNether Progress &6{percent}%'
+      commands: []
+
+    '75':
+      name: '&b&lEnd Preparation &8• &f75%'
+      icon: ANCIENT_DEBRIS
+      lore:
+        - '&7Persiapan akhir untuk membuka'
+        - '&7akses menuju The End.'
+      broadcast: '&b&lFINAL PUSH! &fNether Expedition mencapai &b75%&f.'
+      title: ''
+      subtitle: ''
+      commands: []
+
+    '100':
+      name: '&d&lEnd Expedition Ready &8• &f100%'
+      icon: ENDER_EYE
+      lore:
+        - '&7Target Nether selesai.'
+        - '&7The End siap dibuka.'
+      broadcast: '&d&lMILESTONE COMPLETE! &fNether Expedition mencapai &d100%&f.'
+      title: '&d&l100% COMPLETE'
+      subtitle: '&fThe End expedition objective selesai.'
+      commands: []
 
 # Jika list kosong, plugin memakai World.Environment sebagai fallback.
 # Isi nama world bila setup Multiverse/custom dimension ingin dibuat eksplisit.
