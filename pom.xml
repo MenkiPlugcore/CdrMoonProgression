@@ -6,7 +6,7 @@
 
     <groupId>id.menki</groupId>
     <artifactId>CdrMoonProgression</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>0.7.0-SNAPSHOT</version>
     <name>CdrMoonProgression</name>
     <description>Community dimension progression for Moonsign.</description>
 
