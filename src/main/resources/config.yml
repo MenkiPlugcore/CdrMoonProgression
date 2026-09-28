@@ -1,6 +1,7 @@
-# CdrMoonProgression v0.7.0
+# CdrMoonProgression v1.0.0
 # Paper 1.21.11 / Java 21
 #
+# CORE: Dimension Lock + Global Progression + Personal Contribution + Leaderboard.
 # Progression TIDAK bertambah saat block dihancurkan.
 # Player mengumpulkan resource lalu menyetorkannya melalui /progress.
 
@@ -42,19 +43,15 @@ progression:
     unlock-commands: []
 
 # ============================================================
-# RESOURCE REQUIREMENTS
+# RESOURCE REQUIREMENTS (OPTIONAL LAYER)
 # ============================================================
 # Dimension baru terbuka jika:
 # 1. target point stage tercapai, DAN
 # 2. SEMUA resource requirement stage tercapai.
 #
+# Jika staff ingin progression point-only, ubah enabled menjadi false.
 # Satu requirement boleh menerima beberapa material.
-# Contoh logs di bawah menerima semua jenis overworld log ke counter yang sama.
-#
-# initialize-from-history: saat pertama upgrade ke v0.7, plugin mencoba
-# membangun requirement progress dari history.yml (history sejak v0.5).
-# Data deposit yang lebih tua dari history dapat dikoreksi via:
-# /progressadmin requirements set <stage> <id> <amount>
+# initialize-from-history membantu migrasi data deposit dari history.yml.
 resource-requirements:
   enabled: true
   initialize-from-history: true
@@ -141,18 +138,10 @@ resource-requirements:
         - ANCIENT_DEBRIS
 
 # ============================================================
-# MILESTONE REWARDS
+# MILESTONE REWARDS (OPTIONAL)
 # ============================================================
-# Global milestone reward tetap dapat memakai console command otomatis.
-# Ini berbeda dengan PERSONAL GOALS di bawah yang reward-nya MANUAL oleh admin.
-# Placeholder tersedia di broadcast/title/subtitle/commands:
-# {stage} {stage_key} {percent} {current} {target}
-#
-# Milestone 100% hanya dipicu setelah target point DAN seluruh resource
-# requirement stage selesai.
-#
-# false = saat upgrade dari v0.3, milestone yang sudah terlewati ditandai
-# sebagai REWARDED tanpa mengeksekusi reward lama secara tiba-tiba.
+# Global milestone reward dapat memakai console command otomatis.
+# Milestone 100% hanya dipicu setelah target point dan resource requirement selesai.
 milestones:
   reward-existing-progress-on-first-load: false
 
@@ -269,15 +258,10 @@ milestones:
       commands: []
 
 # ============================================================
-# PERSONAL CONTRIBUTION GOALS
+# PERSONAL CONTRIBUTION GOALS (OPTIONAL)
 # ============================================================
-# Reward personal TIDAK PERNAH diberikan otomatis oleh plugin.
-# Saat goal tercapai, status menjadi PENDING REWARD.
-# Admin memberi hadiah secara manual, lalu menandai goal sebagai REWARDED:
-# /progressadmin goals reward <player> <overworld|nether> <goal>
-#
-# Untuk melihat antrean reward manual:
-# /progressadmin goals pending [overworld|nether|all]
+# Reward personal tidak diberikan otomatis oleh plugin.
+# Admin memberi hadiah manual lalu menandai status REWARDED.
 personal-goals:
   enabled: true
 
@@ -344,23 +328,20 @@ personal-goals:
         - '&7tertinggi di stage Nether.'
 
 # ============================================================
-# CONTRIBUTION HISTORY
+# CONTRIBUTION HISTORY (OPTIONAL)
 # ============================================================
-# history.yml menyimpan audit trail setoran yang BERHASIL.
-# max-entries membatasi file agar tidak tumbuh tanpa batas.
 history:
   enabled: true
   max-entries: 1000
   timezone: 'Asia/Jakarta'
 
 # Jika list kosong, plugin memakai World.Environment sebagai fallback.
-# Isi nama world bila setup Multiverse/custom dimension ingin dibuat eksplisit.
 worlds:
   overworld: []
   nether: []
   end: []
 
-# Mencegah portal, command teleport, dan teleport plugin menuju dimension terkunci.
+# Mencegah portal dan teleport menuju dimension terkunci.
 dimension-lock:
   enabled: true
 
