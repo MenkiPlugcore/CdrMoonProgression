@@ -1,14 +1,14 @@
 name: CdrMoonProgression
-version: 0.7.0-SNAPSHOT
+version: 1.0.0
 main: id.menki.cdrmoonprogression.CdrMoonProgressionPlugin
 api-version: '1.21'
 authors: [Cadera]
-description: Community dimension progression with point and resource requirements for Moonsign.
+description: Dimension lock, community progression, personal contribution, and leaderboard for Moonsign.
 softdepend: [PlaceholderAPI]
 
 commands:
   progress:
-    description: Buka GUI dimension progression, requirements, deposit, milestone, history, dan personal goals.
+    description: Buka GUI progression, kontribusi, requirements, leaderboard, milestone, history, dan personal goals.
     usage: /progress
     aliases: [dimprogress, moonprogress]
   progressadmin:
