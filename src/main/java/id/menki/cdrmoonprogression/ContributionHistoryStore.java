@@ -16,6 +16,7 @@ public final class ContributionHistoryStore {
     private final File file;
     private final List<Entry> entries = new ArrayList<>();
     private int maxEntries;
+    private boolean enabled;
     private boolean dirty;
 
     public ContributionHistoryStore(CdrMoonProgressionPlugin plugin) {
@@ -25,6 +26,7 @@ public final class ContributionHistoryStore {
     }
 
     public void reloadSettings() {
+        enabled = plugin.getConfig().getBoolean("history.enabled", true);
         maxEntries = Math.max(50, plugin.getConfig().getInt("history.max-entries", 1000));
         trim();
     }
@@ -55,7 +57,7 @@ public final class ContributionHistoryStore {
     }
 
     public void add(UUID playerId, String playerName, ProgressStage stage, Material material, int items, long points) {
-        if (playerId == null || stage == null || material == null || items <= 0 || points <= 0) return;
+        if (!enabled || playerId == null || stage == null || material == null || items <= 0 || points <= 0) return;
         entries.add(0, new Entry(playerId, playerName == null ? "Unknown" : playerName, stage, material, items, points, Instant.now().toEpochMilli()));
         trim();
         dirty = true;
@@ -80,6 +82,10 @@ public final class ContributionHistoryStore {
         List<Entry> result = new ArrayList<>();
         for (Entry entry : entries) if (entry.playerId().equals(playerId)) result.add(entry);
         return result;
+    }
+
+    public boolean enabled() {
+        return enabled;
     }
 
     public int size() {
