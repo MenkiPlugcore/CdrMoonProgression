@@ -18,15 +18,18 @@ public final class ProgressCommand implements TabExecutor {
     private final ProgressMenu menu;
     private final MilestoneMenu milestoneMenu;
     private final HistoryMenu historyMenu;
+    private final PersonalGoalMenu personalGoalMenu;
 
     public ProgressCommand(CdrMoonProgressionPlugin plugin, ProgressionService service, ProgressionDataStore data,
-                           ProgressMenu menu, MilestoneMenu milestoneMenu, HistoryMenu historyMenu) {
+                           ProgressMenu menu, MilestoneMenu milestoneMenu, HistoryMenu historyMenu,
+                           PersonalGoalMenu personalGoalMenu) {
         this.plugin = plugin;
         this.service = service;
         this.data = data;
         this.menu = menu;
         this.milestoneMenu = milestoneMenu;
         this.historyMenu = historyMenu;
+        this.personalGoalMenu = personalGoalMenu;
     }
 
     @Override
@@ -38,6 +41,18 @@ public final class ProgressCommand implements TabExecutor {
 
         if (args.length == 0) {
             menu.openMain(player);
+            return true;
+        }
+
+        if (args[0].equalsIgnoreCase("goals") || args[0].equalsIgnoreCase("goal") || args[0].equalsIgnoreCase("target")) {
+            ProgressStage stage = args.length > 1
+                    ? ProgressStage.parse(args[1]).orElse(null)
+                    : service.activeStage().orElse(ProgressStage.OVERWORLD);
+            if (stage == null) {
+                menu.openPersonal(player);
+            } else {
+                personalGoalMenu.open(player, stage);
+            }
             return true;
         }
 
@@ -117,8 +132,10 @@ public final class ProgressCommand implements TabExecutor {
 
     @Override
     public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
-        if (args.length == 1) return filter(List.of("overworld", "nether", "top", "me", "milestones", "history"), args[0]);
-        if (args.length == 2 && (args[0].equalsIgnoreCase("top") || args[0].equalsIgnoreCase("milestones") || args[0].equalsIgnoreCase("milestone"))) {
+        if (args.length == 1) return filter(List.of("overworld", "nether", "top", "me", "milestones", "history", "goals"), args[0]);
+        if (args.length == 2 && (args[0].equalsIgnoreCase("top") || args[0].equalsIgnoreCase("milestones")
+                || args[0].equalsIgnoreCase("milestone") || args[0].equalsIgnoreCase("goals")
+                || args[0].equalsIgnoreCase("goal") || args[0].equalsIgnoreCase("target"))) {
             return filter(List.of("overworld", "nether"), args[1]);
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("history") || args[0].equalsIgnoreCase("riwayat"))) {
