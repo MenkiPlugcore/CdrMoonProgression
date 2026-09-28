@@ -1,4 +1,4 @@
-# CdrMoonProgression v0.6.0
+# CdrMoonProgression v0.7.0
 # Paper 1.21.11 / Java 21
 #
 # Progression TIDAK bertambah saat block dihancurkan.
@@ -42,12 +42,114 @@ progression:
     unlock-commands: []
 
 # ============================================================
+# RESOURCE REQUIREMENTS
+# ============================================================
+# Dimension baru terbuka jika:
+# 1. target point stage tercapai, DAN
+# 2. SEMUA resource requirement stage tercapai.
+#
+# Satu requirement boleh menerima beberapa material.
+# Contoh logs di bawah menerima semua jenis overworld log ke counter yang sama.
+#
+# initialize-from-history: saat pertama upgrade ke v0.7, plugin mencoba
+# membangun requirement progress dari history.yml (history sejak v0.5).
+# Data deposit yang lebih tua dari history dapat dikoreksi via:
+# /progressadmin requirements set <stage> <id> <amount>
+resource-requirements:
+  enabled: true
+  initialize-from-history: true
+
+  overworld:
+    iron_supply:
+      name: '&f&lIron Supply'
+      icon: RAW_IRON
+      target: 3000
+      materials:
+        - RAW_IRON
+
+    gold_supply:
+      name: '&6&lGold Supply'
+      icon: RAW_GOLD
+      target: 1000
+      materials:
+        - RAW_GOLD
+
+    diamond_reserve:
+      name: '&b&lDiamond Reserve'
+      icon: DIAMOND
+      target: 100
+      materials:
+        - DIAMOND
+
+    timber_stockpile:
+      name: '&a&lTimber Stockpile'
+      icon: OAK_LOG
+      target: 5000
+      materials:
+        - OAK_LOG
+        - SPRUCE_LOG
+        - BIRCH_LOG
+        - JUNGLE_LOG
+        - ACACIA_LOG
+        - DARK_OAK_LOG
+        - MANGROVE_LOG
+        - CHERRY_LOG
+
+  nether:
+    netherrack_stockpile:
+      name: '&c&lNetherrack Stockpile'
+      icon: NETHERRACK
+      target: 15000
+      materials:
+        - NETHERRACK
+
+    soul_materials:
+      name: '&7&lSoul Materials'
+      icon: SOUL_SAND
+      target: 3000
+      materials:
+        - SOUL_SAND
+        - SOUL_SOIL
+
+    quartz_supply:
+      name: '&f&lQuartz Supply'
+      icon: QUARTZ
+      target: 3000
+      materials:
+        - QUARTZ
+
+    dark_stone:
+      name: '&8&lDark Stone Supply'
+      icon: BLACKSTONE
+      target: 3000
+      materials:
+        - BLACKSTONE
+        - BASALT
+
+    bone_stockpile:
+      name: '&f&lBone Stockpile'
+      icon: BONE_BLOCK
+      target: 500
+      materials:
+        - BONE_BLOCK
+
+    ancient_material:
+      name: '&6&lAncient Material'
+      icon: ANCIENT_DEBRIS
+      target: 50
+      materials:
+        - ANCIENT_DEBRIS
+
+# ============================================================
 # MILESTONE REWARDS
 # ============================================================
 # Global milestone reward tetap dapat memakai console command otomatis.
 # Ini berbeda dengan PERSONAL GOALS di bawah yang reward-nya MANUAL oleh admin.
 # Placeholder tersedia di broadcast/title/subtitle/commands:
 # {stage} {stage_key} {percent} {current} {target}
+#
+# Milestone 100% hanya dipicu setelah target point DAN seluruh resource
+# requirement stage selesai.
 #
 # false = saat upgrade dari v0.3, milestone yang sudah terlewati ditandai
 # sebagai REWARDED tanpa mengeksekusi reward lama secara tiba-tiba.
@@ -81,19 +183,19 @@ milestones:
       name: '&6&lHalfway &8• &f50%'
       icon: GOLD_INGOT
       lore:
-        - '&7Setengah perjalanan menuju'
+        - '&7Setengah target point menuju'
         - '&7The Nether telah selesai.'
       broadcast: '&6&lHALFWAY! &fOverworld Expedition mencapai &650%&f.'
       title: '&6&lEXPEDITION HALFWAY'
-      subtitle: '&fOverworld Progress &6{percent}%'
+      subtitle: '&fOverworld Point Progress &6{percent}%'
       commands: []
 
     '75':
       name: '&b&lFinal Push &8• &f75%'
       icon: DIAMOND
       lore:
-        - '&7Tinggal seperempat lagi menuju'
-        - '&7pembukaan The Nether.'
+        - '&7Tinggal seperempat target point.'
+        - '&7Resource requirement tetap wajib.'
       broadcast: '&b&lFINAL PUSH! &fOverworld Expedition mencapai &b75%&f.'
       title: ''
       subtitle: ''
@@ -103,11 +205,11 @@ milestones:
       name: '&d&lExpedition Complete &8• &f100%'
       icon: OBSIDIAN
       lore:
-        - '&7Target Overworld selesai.'
-        - '&7The Nether siap dibuka.'
-      broadcast: '&d&lMILESTONE COMPLETE! &fOverworld Expedition mencapai &d100%&f.'
-      title: '&d&l100% COMPLETE'
-      subtitle: '&fThe Nether expedition objective selesai.'
+        - '&7Point dan resource requirement'
+        - '&7Overworld telah selesai.'
+      broadcast: '&d&lMILESTONE COMPLETE! &fOverworld Expedition selesai sepenuhnya.'
+      title: '&d&lEXPEDITION COMPLETE'
+      subtitle: '&fThe Nether siap dibuka.'
       commands: []
 
   nether:
@@ -126,7 +228,7 @@ milestones:
       name: '&e&lNether Supply II &8• &f25%'
       icon: QUARTZ
       lore:
-        - '&7Seperempat kebutuhan menuju'
+        - '&7Seperempat target point menuju'
         - '&7The End sudah terkumpul.'
       broadcast: '&e&lMILESTONE! &fNether Expedition mencapai &e25%&f.'
       title: ''
@@ -137,19 +239,19 @@ milestones:
       name: '&6&lNether Halfway &8• &f50%'
       icon: GOLD_BLOCK
       lore:
-        - '&7Perjalanan menuju The End'
+        - '&7Target point menuju The End'
         - '&7telah mencapai setengah jalan.'
       broadcast: '&6&lHALFWAY! &fNether Expedition mencapai &650%&f.'
       title: '&6&lNETHER HALFWAY'
-      subtitle: '&fNether Progress &6{percent}%'
+      subtitle: '&fNether Point Progress &6{percent}%'
       commands: []
 
     '75':
       name: '&b&lEnd Preparation &8• &f75%'
       icon: ANCIENT_DEBRIS
       lore:
-        - '&7Persiapan akhir untuk membuka'
-        - '&7akses menuju The End.'
+        - '&7Persiapan akhir membuka The End.'
+        - '&7Resource requirement tetap wajib.'
       broadcast: '&b&lFINAL PUSH! &fNether Expedition mencapai &b75%&f.'
       title: ''
       subtitle: ''
@@ -159,11 +261,11 @@ milestones:
       name: '&d&lEnd Expedition Ready &8• &f100%'
       icon: ENDER_EYE
       lore:
-        - '&7Target Nether selesai.'
-        - '&7The End siap dibuka.'
-      broadcast: '&d&lMILESTONE COMPLETE! &fNether Expedition mencapai &d100%&f.'
-      title: '&d&l100% COMPLETE'
-      subtitle: '&fThe End expedition objective selesai.'
+        - '&7Point dan resource requirement'
+        - '&7Nether telah selesai.'
+      broadcast: '&d&lMILESTONE COMPLETE! &fNether Expedition selesai sepenuhnya.'
+      title: '&d&lEXPEDITION COMPLETE'
+      subtitle: '&fThe End siap dibuka.'
       commands: []
 
 # ============================================================
@@ -264,8 +366,8 @@ dimension-lock:
 
 messages:
   prefix: '&8[&bMoon Progress&8]&r '
-  locked-nether: '&cNether masih terkunci! &7Progress Overworld: &f{current}/{target} &7({percent}%)'
-  locked-end: '&cThe End masih terkunci! &7Progress Nether: &f{current}/{target} &7({percent}%)'
+  locked-nether: '&cNether masih terkunci! &7Points: &f{current}/{target} &8• &7Requirements: &f{requirements_done}/{requirements_total}'
+  locked-end: '&cThe End masih terkunci! &7Points: &f{current}/{target} &8• &7Requirements: &f{requirements_done}/{requirements_total}'
   unlock-broadcast: '&b&lDIMENSION UNLOCKED! &f{dimension} &7sekarang dapat diakses.'
   unlock-title: '&b&lDIMENSION UNLOCKED'
   unlock-subtitle: '&f{dimension} &7telah terbuka!'
