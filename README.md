@@ -5,14 +5,23 @@ Community dimension progression plugin untuk Moonsign. Target awal: Paper 1.21.1
 ## Gameplay flow
 
 1. Player mengumpulkan progression dari block natural di Overworld.
-2. Saat global Overworld mencapai `50,000`, The Nether otomatis terbuka.
-3. Progress berikutnya hanya dihitung dari resource Nether.
-4. Saat global Nether mencapai `70,000`, The End otomatis terbuka.
+2. `/progress` membuka GUI utama progression.
+3. Saat global Overworld mencapai `50,000`, The Nether otomatis terbuka.
+4. Progress berikutnya hanya dihitung dari resource Nether.
+5. Saat global Nether mencapai `70,000`, The End otomatis terbuka.
 
 Target dan nilai setiap block dapat diubah dari `config.yml`.
 
-## Fitur v0.1.0
+## Fitur v0.2.0
 
+- Full inventory GUI untuk `/progress`.
+- Main progression dashboard.
+- Detail stage Overworld dan Nether.
+- Visual progress bar di inventory.
+- Personal contribution panel.
+- Top contributor leaderboard GUI.
+- Resource contribution browser + point value.
+- GUI pagination untuk resource list.
 - Global progression per stage.
 - Personal contribution per player.
 - Configurable block point values.
@@ -21,15 +30,25 @@ Target dan nilai setiap block dapat diubah dari `config.yml`.
 - Anti exploit player-placed block yang persisten setelah restart.
 - Tracking perpindahan placed block oleh piston.
 - Cleanup marker saat block terbakar/meledak.
-- `/progress` dan leaderboard `/progress top`.
 - Admin control `/progressadmin`.
 - Optional PlaceholderAPI hook.
 - Auto-save progress + compact binary placement database.
 
-## Commands
+Tidak ada BossBar progression. HUD player tetap bersih; status progression dibuka saat diperlukan melalui GUI.
 
-- `/progress`
+## Player command
+
+- `/progress` — membuka menu utama.
+
+Shortcut berikut tetap tersedia untuk staff/testing atau akses cepat:
+
+- `/progress overworld`
+- `/progress nether`
 - `/progress top [overworld|nether]`
+- `/progress me`
+
+## Admin commands
+
 - `/progressadmin status`
 - `/progressadmin add <overworld|nether> <amount> [player]`
 - `/progressadmin set <overworld|nether> <amount>`
@@ -72,5 +91,5 @@ mvn clean package
 Output:
 
 ```text
-target/CdrMoonProgression-0.1.0-SNAPSHOT.jar
+target/CdrMoonProgression-0.2.0-SNAPSHOT.jar
 ```
